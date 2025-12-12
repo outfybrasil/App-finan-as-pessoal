@@ -22,7 +22,8 @@ export const financeService = {
       category: t.category,
       date: t.date,
       description: t.description,
-      type: t.type
+      type: t.type,
+      isPaid: t.is_paid // Mapeia status de pagamento
     }));
   },
 
@@ -32,34 +33,46 @@ export const financeService = {
     const rawPayload = Array.isArray(transaction) ? transaction : [transaction];
     
     // Sanitização e mapeamento para snake_case
-    // REMOVIDO group_id para evitar erro se a coluna não existir no banco de dados do usuário
     const payload = rawPayload.map(t => ({
         amount: t.amount,
         category: t.category,
         date: t.date,
         description: t.description,
-        type: t.type
+        type: t.type,
+        is_paid: t.isPaid
         // group_id: t.groupId 
     }));
 
-    const { data, error } = await supabase
+    // Tenta inserir
+    let result = await supabase
       .from('transactions')
       .insert(payload)
       .select();
 
-    if (error) {
-      console.error('Erro ao adicionar transação:', error.message || error);
+    // Fallback: Se der erro de coluna inexistente, tenta inserir sem o campo is_paid
+    if (result.error && (result.error.message.includes('is_paid') || result.error.message.includes('column "is_paid" of relation "transactions" does not exist'))) {
+      console.warn('Coluna is_paid não detectada no Supabase. Salvando sem este campo. Execute "alter table transactions add column is_paid boolean default true;" no banco.');
+      const fallbackPayload = payload.map(({ is_paid, ...rest }) => rest);
+      result = await supabase
+        .from('transactions')
+        .insert(fallbackPayload)
+        .select();
+    }
+
+    if (result.error) {
+      console.error('Erro ao adicionar transação:', result.error.message || result.error);
       return null;
     }
     
-    return (data || []).map((d: any) => ({
+    return (result.data || []).map((d: any) => ({
       id: String(d.id),
       groupId: d.group_id,
       amount: Number(d.amount),
       category: d.category,
       date: d.date,
       description: d.description,
-      type: d.type
+      type: d.type,
+      isPaid: d.is_paid
     }));
   },
 
@@ -73,21 +86,36 @@ export const financeService = {
     if (updates.description !== undefined) sanitizedUpdates.description = updates.description;
     if (updates.date !== undefined) sanitizedUpdates.date = updates.date;
     if (updates.type !== undefined) sanitizedUpdates.type = updates.type;
+    if (updates.isPaid !== undefined) sanitizedUpdates.is_paid = updates.isPaid;
     
     // REMOVIDO group_id update
     // if (updates.groupId !== undefined) sanitizedUpdates.group_id = updates.groupId;
 
-    const { data, error } = await supabase
+    let result = await supabase
         .from('transactions')
         .update(sanitizedUpdates)
         .eq('id', id)
         .select()
         .single();
 
-    if (error) {
-        console.error('Erro ao atualizar transação:', error.message || error);
+    // Fallback: Se der erro de coluna inexistente, tenta atualizar sem is_paid
+    if (result.error && (result.error.message.includes('is_paid') || result.error.message.includes('column "is_paid" of relation "transactions" does not exist'))) {
+         console.warn('Coluna is_paid não detectada no Supabase. Atualizando sem este campo.');
+         delete sanitizedUpdates.is_paid;
+         result = await supabase
+            .from('transactions')
+            .update(sanitizedUpdates)
+            .eq('id', id)
+            .select()
+            .single();
+    }
+
+    if (result.error) {
+        console.error('Erro ao atualizar transação:', result.error.message || result.error);
         return null;
     }
+
+    const data = result.data;
 
     return {
         id: String(data.id),
@@ -96,7 +124,8 @@ export const financeService = {
         category: data.category,
         date: data.date,
         description: data.description,
-        type: data.type
+        type: data.type,
+        isPaid: data.is_paid
     };
   },
 

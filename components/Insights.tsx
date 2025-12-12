@@ -3,6 +3,7 @@ import { generateFinancialInsights } from '../services/geminiService';
 import { Transaction, Budget, Goal, Insight } from '../types';
 import { Sparkles, Lightbulb, TrendingUp, AlertOctagon, Loader2, CheckCircle2, X, ArrowRight } from 'lucide-react';
 import { Button } from './Button';
+import { FinancialAudit } from './FinancialAudit';
 
 interface InsightsProps {
   transactions: Transaction[];
@@ -59,24 +60,32 @@ export const Insights: React.FC<InsightsProps> = ({ transactions, budgets, goals
         <div className="inline-flex items-center justify-center p-3 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl shadow-lg shadow-purple-500/20 mb-4">
           <Sparkles className="text-white w-8 h-8" />
         </div>
-        <h2 className="text-3xl font-bold text-white">Fluxo AI</h2>
+        <h2 className="text-3xl font-bold text-white">Assistente Inteligente</h2>
         <p className="text-slate-400 max-w-lg mx-auto">
           Análise inteligente dos seus hábitos financeiros para encontrar oportunidades de economia e alertas de tendências.
         </p>
-        
-        <div className="flex justify-center mt-6">
-          <Button 
+      </div>
+
+      {/* Financial Audit Section (New Idea #2) */}
+      <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <FinancialAudit transactions={transactions} />
+      </div>
+
+      <div className="flex justify-between items-center pt-8 border-t border-slate-800">
+         <h3 className="text-xl font-bold text-white">Insights Sugeridos</h3>
+         <Button 
+            size="sm"
             onClick={fetchInsights} 
             disabled={loading}
             className="flex items-center gap-2"
+            variant="secondary"
           >
-            {loading ? <Loader2 className="animate-spin" /> : <Sparkles size={18} />}
-            {loading ? 'Analisando dados...' : 'Atualizar Insights'}
+            {loading ? <Loader2 className="animate-spin" size={14}/> : <Sparkles size={14} />}
+            {loading ? 'Analisando...' : 'Atualizar'}
           </Button>
-        </div>
       </div>
 
-      <div className="grid gap-4 mt-8">
+      <div className="grid gap-4">
         {insights.map((insight) => (
           <div 
             key={insight.id}

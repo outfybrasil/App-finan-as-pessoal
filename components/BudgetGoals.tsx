@@ -6,10 +6,11 @@ import { GoalModal } from './GoalModal';
 interface BudgetGoalsProps {
   budgets: Budget[];
   goals: Goal[];
-  transactions: Transaction[]; // Adicionado
+  transactions: Transaction[]; 
   onAddGoal?: (goal: Omit<Goal, 'id'>) => void;
   onUpdateGoal?: (id: string, goal: Partial<Goal>) => void;
   onDeleteGoal?: (id: string) => void;
+  privacyMode?: boolean; // Novo prop
 }
 
 export const BudgetGoals: React.FC<BudgetGoalsProps> = ({ 
@@ -18,7 +19,8 @@ export const BudgetGoals: React.FC<BudgetGoalsProps> = ({
   transactions,
   onAddGoal,
   onUpdateGoal,
-  onDeleteGoal
+  onDeleteGoal,
+  privacyMode = false
 }) => {
   const [showGoalModal, setShowGoalModal] = useState(false);
   const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
@@ -40,6 +42,8 @@ export const BudgetGoals: React.FC<BudgetGoalsProps> = ({
     setShowGoalModal(false);
   };
 
+  const privacyClass = privacyMode ? "blur-sm select-none bg-slate-700/50 rounded text-transparent" : "";
+
   return (
     <div className="space-y-8 pb-20 md:pb-0">
       
@@ -60,7 +64,7 @@ export const BudgetGoals: React.FC<BudgetGoalsProps> = ({
                 <div className="flex justify-between items-center mb-2">
                   <span className="font-semibold text-white">{budget.category}</span>
                   <span className={`text-sm ${remaining < 0 ? 'text-rose-400' : 'text-slate-400'}`}>
-                    {remaining < 0 ? 'Excedido' : 'Restante'}: R$ {Math.abs(remaining).toFixed(0)}
+                    {remaining < 0 ? 'Excedido' : 'Restante'}: <span className={privacyClass}>R$ {Math.abs(remaining).toFixed(0)}</span>
                   </span>
                 </div>
                 
@@ -72,8 +76,8 @@ export const BudgetGoals: React.FC<BudgetGoalsProps> = ({
                 </div>
                 
                 <div className="flex justify-between mt-2 text-xs text-slate-500">
-                  <span>Gasto: R$ {budget.spent}</span>
-                  <span>Limite: R$ {budget.limit}</span>
+                  <span>Gasto: <span className={privacyMode ? "blur-xs select-none" : ""}>R$ {budget.spent}</span></span>
+                  <span>Limite: <span className={privacyMode ? "blur-xs select-none" : ""}>R$ {budget.limit}</span></span>
                 </div>
 
                 {budget.cumulative && remaining > 0 && (
@@ -124,8 +128,8 @@ export const BudgetGoals: React.FC<BudgetGoalsProps> = ({
                  <p className="text-xs text-slate-400 mb-4">Prazo: {new Date(goal.deadline).toLocaleDateString('pt-BR')}</p>
                  
                  <div className="flex items-end gap-1 mb-2">
-                    <span className="text-2xl font-bold text-emerald-400">R$ {goal.currentAmount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                    <span className="text-xs text-slate-500 mb-1.5 font-medium">/ {goal.targetAmount.toLocaleString('pt-BR', {compactDisplay: 'short', notation: 'compact'})}</span>
+                    <span className={`text-2xl font-bold text-emerald-400 ${privacyClass}`}>R$ {goal.currentAmount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                    <span className="text-xs text-slate-500 mb-1.5 font-medium">/ <span className={privacyMode ? 'blur-xs select-none' : ''}>{goal.targetAmount.toLocaleString('pt-BR', {compactDisplay: 'short', notation: 'compact'})}</span></span>
                  </div>
                  
                  <div className="h-2 bg-slate-900 rounded-full overflow-hidden">

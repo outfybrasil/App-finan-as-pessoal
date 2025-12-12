@@ -21,8 +21,8 @@ export const generateFinancialInsights = async (
   });
 
   const prompt = `
-    Você é o assistente de IA do aplicativo financeiro "Fluxo". 
-    Analise os seguintes dados financeiros do usuário (JSON abaixo) e gere 3 insights curtos e acionáveis.
+    Você é o assistente de IA pessoal do Gustavo para finanças. 
+    Analise os seguintes dados financeiros dele (JSON abaixo) e gere 3 insights curtos e acionáveis.
     
     Tipos de insights desejados:
     1. "opportunity": Sugestão de economia ou renegociação.
@@ -40,7 +40,7 @@ export const generateFinancialInsights = async (
       }
     ]
 
-    No campo "actionPlan", forneça 2 a 3 passos extremamente práticos e diretos para o usuário resolver o problema ou aproveitar a oportunidade.
+    No campo "actionPlan", forneça 2 a 3 passos extremamente práticos e diretos para o Gustavo resolver o problema ou aproveitar a oportunidade.
 
     Dados: ${context}
   `;
@@ -67,7 +67,7 @@ export const generateFinancialInsights = async (
       {
         id: 'fallback-1',
         title: 'Modo Offline',
-        description: 'Não foi possível conectar à IA do Fluxo. Verifique sua chave de API.',
+        description: 'Não foi possível conectar à IA. Verifique sua chave de API.',
         type: 'info',
         actionPlan: ['Verifique sua conexão com a internet', 'Confira se a chave de API está configurada corretamente']
       }
@@ -133,7 +133,7 @@ export const analyzeGoalStrategy = async (
         .join(', ');
 
     const prompt = `
-      Atue como um planejador financeiro especialista e realista.
+      Atue como um planejador financeiro especialista e realista para o Gustavo.
       
       DADOS DA META:
       - Alvo: R$ ${targetAmount}
@@ -141,14 +141,14 @@ export const analyzeGoalStrategy = async (
       - Prazo: ${deadline} (${monthsRemaining} meses)
       - Valor Matemático Necessário: R$ ${mathMonthly.toFixed(2)} / mês
 
-      CONTEXTO FINANCEIRO DO USUÁRIO (Média Mensal Recente):
+      CONTEXTO FINANCEIRO DO GUSTAVO (Média Mensal Recente):
       - Renda Média: R$ ${avgIncome.toFixed(2)}
       - Gastos Médios: R$ ${avgExpense.toFixed(2)}
       - Sobra de Caixa (Disponível): R$ ${avgDisposable.toFixed(2)}
       - Onde mais gasta: ${topCategories || "Sem dados suficientes"}
 
       TAREFA:
-      1. Verifique se o usuário consegue pagar o "Valor Matemático Necessário" com a "Sobra de Caixa".
+      1. Verifique se o Gustavo consegue pagar o "Valor Matemático Necessário" com a "Sobra de Caixa".
       2. Se a Sobra for MENOR que o Necessário: Sugira cortes específicos nas categorias onde ele mais gasta para atingir a meta.
       3. Se a Sobra for MAIOR: Valide que a meta é saudável, mas sugira não usar toda a sobra.
       4. No "alternativeScenario", sugira como acelerar ou ajustar caso a meta seja impossível.
@@ -179,4 +179,56 @@ export const analyzeGoalStrategy = async (
         console.error("Erro ao calcular estratégia de meta", error);
         return null;
     }
+};
+
+export interface AuditAdvice {
+  score: number;
+  message: string;
+}
+
+export const generateAuditAdvice = async (
+  income: number,
+  needs: number,
+  wants: number,
+  savings: number
+): Promise<AuditAdvice | null> => {
+  const modelId = 'gemini-2.5-flash';
+  
+  const needsPct = ((needs / income) * 100).toFixed(1);
+  const wantsPct = ((wants / income) * 100).toFixed(1);
+  const savingsPct = ((savings / income) * 100).toFixed(1);
+
+  const prompt = `
+    Atue como um Consultor Financeiro Sênior fazendo uma auditoria na regra 50/30/20.
+    
+    DADOS:
+    - Renda: R$ ${income}
+    - Necessidades (Meta 50%): ${needsPct}% (R$ ${needs})
+    - Desejos (Meta 30%): ${wantsPct}% (R$ ${wants})
+    - Investimentos/Dívidas (Meta 20%): ${savingsPct}% (R$ ${savings})
+
+    TAREFA:
+    1. Dê uma nota de 0 a 10 para a saúde financeira baseada APENAS nesses números.
+    2. Escreva um comentário curto (Max 30 palavras) em primeira pessoa ("Eu notei que..."), direto e levemente informal, apontando onde está o desequilíbrio principal.
+
+    Retorne JSON:
+    {
+      "score": number,
+      "message": "string"
+    }
+  `;
+
+  try {
+      const response = await ai.models.generateContent({
+          model: modelId,
+          contents: prompt,
+          config: { responseMimeType: "application/json" }
+      });
+      const text = response.text;
+      if(!text) return null;
+      return JSON.parse(text) as AuditAdvice;
+  } catch (e) {
+      console.error("Erro no audit", e);
+      return null;
+  }
 }

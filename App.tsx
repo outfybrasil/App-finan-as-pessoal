@@ -1,18 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { View, Transaction, Budget, Goal, TransactionType } from './types';
-import { LayoutDashboard, Plus, PieChart, BarChart3, Sparkles, Database } from 'lucide-react';
+import { LayoutDashboard, Plus, PieChart, BarChart3, Sparkles, Database, ShoppingCart, Calendar as CalendarIcon, Eye, EyeOff, LogOut } from 'lucide-react';
 import { Dashboard } from './components/Dashboard';
 import { QuickAdd } from './components/QuickAdd';
 import { BudgetGoals } from './components/BudgetGoals';
 import { Insights } from './components/Insights';
 import { Reports } from './components/Reports';
+import { ShoppingList } from './components/ShoppingList';
+import { CalendarView } from './components/CalendarView';
 import { financeService } from './services/financeService';
 import { supabase } from './lib/supabaseClient';
+import { Auth } from './components/Auth';
+import { Session } from '@supabase/supabase-js';
 
 const App: React.FC = () => {
+  const [session, setSession] = useState<Session | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
   const [currentView, setCurrentView] = useState<View>(View.DASHBOARD);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [loading, setLoading] = useState(true);
+  
+  // Privacy Mode State
+  const [privacyMode, setPrivacyMode] = useState(false);
   
   // Date Filter State
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -23,14 +33,33 @@ const App: React.FC = () => {
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
 
-  // State for editing
+  // State for editing and pre-filling
   const [transactionToEdit, setTransactionToEdit] = useState<Transaction | null>(null);
 
   // Helper para gerar IDs simples
   const generateId = () => Date.now().toString(36) + Math.random().toString(36).substr(2);
 
-  // Carregar dados iniciais
+  // Gerenciar Sessão
   useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setAuthLoading(false);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      setAuthLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Carregar dados iniciais (Apenas se tiver sessão)
+  useEffect(() => {
+    if (!session) return;
+
     const loadData = async () => {
       setLoading(true);
       try {
@@ -51,15 +80,13 @@ const App: React.FC = () => {
     };
 
     loadData();
-  }, []);
+  }, [session]);
 
   // Filter transactions when date or list changes
   useEffect(() => {
     const filtered = allTransactions.filter(t => {
       const tDate = new Date(t.date);
       // Ajuste de fuso horário simples para garantir que a comparação de mês funcione
-      // (Considerando que a data do banco vem YYYY-MM-DD e o Date object assume UTC as vezes)
-      // Vamos comparar ano e mes
       return tDate.getUTCMonth() === currentMonth.getMonth() && 
              tDate.getUTCFullYear() === currentMonth.getFullYear();
     });
@@ -74,7 +101,8 @@ const App: React.FC = () => {
       type: TransactionType,
       installments: number = 1,
       isRecurring: boolean = false,
-      currentInstallment: number = 1 // Novo parâmetro
+      currentInstallment: number = 1,
+      isPaid: boolean = true
   ) => {
     
     // Prepare transaction objects
@@ -93,6 +121,10 @@ const App: React.FC = () => {
             const currentDate = new Date(startDate);
             currentDate.setMonth(startDate.getMonth() + monthOffset);
             
+            // Apenas a parcela atual (primeira criada) respeita o status "isPaid" selecionado no form
+            // Parcelas futuras são geradas como Pendentes por padrão
+            const isThisInstallmentPaid = (i === currentInstallment) ? isPaid : false;
+
             newTransactions.push({
                 groupId,
                 amount: parseFloat(installmentValue.toFixed(2)),
@@ -100,7 +132,8 @@ const App: React.FC = () => {
                 description: `${description} (${i}/${installments})`,
                 date: currentDate.toISOString().split('T')[0],
                 type,
-                isRecurring: false
+                isRecurring: false,
+                isPaid: isThisInstallmentPaid
             });
             monthOffset++;
         }
@@ -114,6 +147,9 @@ const App: React.FC = () => {
             const currentDate = new Date(startDate);
             currentDate.setMonth(startDate.getMonth() + i);
             
+            // Apenas o primeiro item respeita o status, futuros são pendentes
+            const isThisItemPaid = (i === 0) ? isPaid : false;
+
             newTransactions.push({
                 groupId,
                 amount: amount, // Valor integral
@@ -121,7 +157,8 @@ const App: React.FC = () => {
                 description: description, // Descrição limpa
                 date: currentDate.toISOString().split('T')[0],
                 type,
-                isRecurring: true // Marcado visualmente como fixo
+                isRecurring: true, // Marcado visualmente como fixo
+                isPaid: isThisItemPaid
             });
         }
     }
@@ -133,7 +170,8 @@ const App: React.FC = () => {
             description,
             date,
             type,
-            isRecurring
+            isRecurring,
+            isPaid
         });
     }
 
@@ -198,7 +236,8 @@ const App: React.FC = () => {
              const siblingUpdates = {
                  ...updates,
                  description: newDescription,
-                 date: sibling.id === id ? updates.date : sibling.date // Mantém a data original das outras, altera só a atual se solicitado
+                 date: sibling.id === id ? updates.date : sibling.date, // Mantém a data original das outras, altera só a atual se solicitado
+                 isPaid: sibling.id === id ? updates.isPaid : sibling.isPaid // Mantém status original das outras, altera só a atual
              };
 
              transactionsToUpdate.push({ id: sibling.id, data: siblingUpdates });
@@ -235,6 +274,20 @@ const App: React.FC = () => {
       }
       
       setTransactionToEdit(null);
+  };
+
+  const handleToggleStatus = async (t: Transaction) => {
+     const newStatus = !t.isPaid;
+     
+     // Optimistic update locally
+     setAllTransactions(prev => prev.map(item => 
+        item.id === t.id ? { ...item, isPaid: newStatus } : item
+     ));
+
+     // Sync with DB
+     if (supabase) {
+         await financeService.updateTransaction(t.id, { isPaid: newStatus });
+     }
   };
 
   const handleDeleteTransaction = async (id: string) => {
@@ -292,12 +345,44 @@ const App: React.FC = () => {
       setShowQuickAdd(true);
   };
 
+  // --- Shopping List Handler ---
+  const handleFinishShopping = (total: number) => {
+      const preFill: any = {
+          amount: total,
+          category: 'Mercado',
+          description: 'Compras de Mercado (Lista)',
+          type: 'expense',
+          date: new Date().toISOString().split('T')[0],
+          isRecurring: false,
+          isPaid: true
+      };
+      setTransactionToEdit({ ...preFill, id: '' });
+      setShowQuickAdd(true);
+  };
+
+
   const navItems = [
     { view: View.DASHBOARD, label: 'Início', icon: LayoutDashboard },
+    { view: View.CALENDAR, label: 'Calendário', icon: CalendarIcon },
+    { view: View.SHOPPING_LIST, label: 'Lista', icon: ShoppingCart },
     { view: View.BUDGETS, label: 'Metas', icon: PieChart },
     { view: View.REPORTS, label: 'Relatórios', icon: BarChart3 },
-    { view: View.INSIGHTS, label: 'Fluxo AI', icon: Sparkles },
+    { view: View.INSIGHTS, label: 'Assistente', icon: Sparkles },
   ];
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-400">
+        <div className="animate-pulse flex flex-col items-center gap-4">
+          <div className="w-12 h-12 bg-slate-800 rounded-xl"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return <Auth />;
+  }
 
   if (loading) {
     return (
@@ -317,9 +402,9 @@ const App: React.FC = () => {
       <aside className="hidden md:flex flex-col w-64 border-r border-slate-800 bg-slate-900 p-6 fixed h-full z-10">
         <div className="flex items-center gap-3 mb-10">
           <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center">
-            <span className="font-bold text-white text-lg">F</span>
+            <span className="font-bold text-white text-lg">M</span>
           </div>
-          <span className="font-bold text-xl tracking-tight">Fluxo</span>
+          <span className="font-bold text-xl tracking-tight">Minhas Finanças</span>
         </div>
         
         <nav className="space-y-2 flex-1">
@@ -339,41 +424,65 @@ const App: React.FC = () => {
           ))}
         </nav>
 
-        {!supabase && (
-           <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg text-xs text-amber-200">
-             <div className="flex items-center gap-2 mb-1 font-bold">
-               <Database size={14}/> Modo Local
-             </div>
-             Configure as chaves do Supabase para sincronizar.
-           </div>
-        )}
+        <div className="mt-auto space-y-4">
+            {/* Privacy Toggle Desktop */}
+            <button 
+                onClick={() => setPrivacyMode(!privacyMode)}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all"
+            >
+                {privacyMode ? <EyeOff size={20} /> : <Eye size={20} />}
+                {privacyMode ? 'Mostrar Valores' : 'Ocultar Valores'}
+            </button>
 
-        <button 
-          onClick={() => { setTransactionToEdit(null); setShowQuickAdd(true); }}
-          className="bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl py-3 px-4 flex items-center justify-center gap-2 font-medium transition-colors mt-auto"
-        >
-          <Plus size={20} />
-          Registrar
-        </button>
+            {!supabase && (
+            <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg text-xs text-amber-200">
+                <div className="flex items-center gap-2 mb-1 font-bold">
+                <Database size={14}/> Modo Local
+                </div>
+                Configure as chaves do Supabase.
+            </div>
+            )}
+
+            {/* Logout Button */}
+            <button 
+              onClick={() => supabase.auth.signOut()}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-all"
+            >
+              <LogOut size={20} />
+              Sair
+            </button>
+
+            <button 
+            onClick={() => { setTransactionToEdit(null); setShowQuickAdd(true); }}
+            className="bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl py-3 px-4 flex items-center justify-center gap-2 font-medium transition-colors w-full"
+            >
+            <Plus size={20} />
+            Registrar
+            </button>
+        </div>
       </aside>
 
       {/* Main Content */}
       <main className="flex-1 md:ml-64 p-6 overflow-y-auto min-h-screen">
-        <div className="max-w-6xl mx-auto animate-in fade-in duration-500">
-          {/* Empty State Helper (Only if absolutely no transactions ever) */}
-          {allTransactions.length === 0 && !loading && (
-             <div className="mb-8 p-6 bg-slate-800/50 border border-slate-800 rounded-2xl text-center">
-                <h3 className="text-white font-bold text-lg mb-2">Tudo pronto para começar!</h3>
-                <p className="text-slate-400 mb-4">Você não tem transações registradas. Adicione a primeira para ver o painel ganhar vida.</p>
-                <button 
-                  onClick={() => { setTransactionToEdit(null); setShowQuickAdd(true); }}
-                  className="text-emerald-400 font-medium hover:underline"
-                >
-                  + Adicionar Transação
-                </button>
-             </div>
-          )}
+        {/* Mobile Header with Logout */}
+        <div className="md:hidden flex justify-between items-center mb-6">
+           <div className="flex items-center gap-2">
+              <div className="w-6 h-6 bg-emerald-500 rounded flex items-center justify-center">
+                <span className="font-bold text-white text-xs">M</span>
+              </div>
+              <span className="font-bold text-sm tracking-tight">Minhas Finanças</span>
+           </div>
+           <button 
+              onClick={() => supabase.auth.signOut()}
+              className="p-2 bg-slate-900 rounded-lg text-rose-400 border border-slate-800 hover:bg-slate-800"
+              title="Sair"
+           >
+              <LogOut size={16} />
+           </button>
+        </div>
 
+        <div className="max-w-6xl mx-auto animate-in fade-in duration-500">
+          
           {currentView === View.DASHBOARD && (
             <Dashboard 
                 transactions={filteredTransactions} 
@@ -381,16 +490,32 @@ const App: React.FC = () => {
                 currentMonth={currentMonth}
                 onMonthChange={setCurrentMonth}
                 onEditTransaction={openEditModal}
+                onToggleStatus={handleToggleStatus}
+                privacyMode={privacyMode} // Pass Prop
             />
+          )}
+          {currentView === View.CALENDAR && (
+            <CalendarView 
+                transactions={filteredTransactions} // Uses filtered for current month view logic inside
+                currentMonth={currentMonth}
+                onMonthChange={setCurrentMonth}
+                onEditTransaction={openEditModal}
+                onToggleStatus={handleToggleStatus}
+                privacyMode={privacyMode}
+            />
+          )}
+          {currentView === View.SHOPPING_LIST && (
+              <ShoppingList onFinishShopping={handleFinishShopping} />
           )}
           {currentView === View.BUDGETS && (
             <BudgetGoals 
                 budgets={budgets} 
                 goals={goals} 
-                transactions={allTransactions} // Passando TODAS as transações para a IA analisar
+                transactions={allTransactions} 
                 onAddGoal={handleAddGoal}
                 onUpdateGoal={handleUpdateGoal}
                 onDeleteGoal={handleDeleteGoal}
+                privacyMode={privacyMode} // Pass Prop
             />
           )}
           {currentView === View.REPORTS && <Reports transactions={allTransactions} />}
@@ -399,19 +524,27 @@ const App: React.FC = () => {
       </main>
 
       {/* Mobile Navigation */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 px-6 py-4 flex justify-between items-center z-40 safe-area-pb">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 px-2 py-4 flex justify-between items-center z-40 safe-area-pb">
         {navItems.map((item) => (
           <button
             key={item.view}
             onClick={() => setCurrentView(item.view)}
-            className={`flex flex-col items-center gap-1 ${
+            className={`flex flex-col items-center gap-1 min-w-[50px] ${
               currentView === item.view ? 'text-emerald-500' : 'text-slate-500'
             }`}
           >
-            <item.icon size={24} />
-            <span className="text-[10px] font-medium">{item.label}</span>
+            <item.icon size={22} />
+            <span className="text-[9px] font-medium">{item.label}</span>
           </button>
         ))}
+         {/* Privacy Toggle Mobile */}
+         <button
+            onClick={() => setPrivacyMode(!privacyMode)}
+            className="flex flex-col items-center gap-1 min-w-[50px] text-slate-500 active:text-white"
+          >
+            {privacyMode ? <EyeOff size={22} /> : <Eye size={22} />}
+            <span className="text-[9px] font-medium">Privacidade</span>
+          </button>
       </div>
 
       {/* Mobile Floating Action Button (FAB) */}

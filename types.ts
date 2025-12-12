@@ -9,6 +9,7 @@ export interface Transaction {
   description: string;
   type: TransactionType;
   isRecurring?: boolean; // Para identificar despesas fixas visualmente
+  isPaid?: boolean; // Status de pagamento (Pago/Recebido ou Pendente)
 }
 
 export interface Budget {
@@ -35,10 +36,20 @@ export interface Insight {
   actionPlan?: string[]; // Lista de passos práticos sugeridos pela IA
 }
 
+export interface ShoppingItem {
+  id: string;
+  name: string;
+  estimatedPrice: number;
+  quantity: number;
+  checked: boolean;
+}
+
 export enum View {
   DASHBOARD = 'dashboard',
   QUICK_ADD = 'quick_add',
   BUDGETS = 'budgets',
   REPORTS = 'reports',
-  INSIGHTS = 'insights'
+  INSIGHTS = 'insights',
+  SHOPPING_LIST = 'shopping_list',
+  CALENDAR = 'calendar'
 }

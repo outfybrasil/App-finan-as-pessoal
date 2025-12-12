@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Transaction, TransactionType } from '../types';
 import { Button } from './Button';
-import { ArrowUpCircle, ArrowDownCircle, X, CalendarClock, Trash2, Hash, Layers, Info, Copy } from 'lucide-react';
+import { ArrowUpCircle, ArrowDownCircle, X, CalendarClock, Trash2, Hash, Layers, Info, Copy, CheckCircle2, Clock } from 'lucide-react';
 import { ConfirmationModal } from './ConfirmationModal';
 
 interface QuickAddProps {
@@ -13,7 +13,8 @@ interface QuickAddProps {
     type: TransactionType,
     installments: number,
     isRecurring: boolean,
-    currentInstallment?: number
+    currentInstallment?: number,
+    isPaid?: boolean
   ) => void;
   onEdit?: (id: string, updates: any, updateSeries?: boolean) => void;
   onDelete?: (id: string) => void;
@@ -30,12 +31,25 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
 }) => {
   const isEditing = !!initialData;
 
+  // Função helper para pegar data local YYYY-MM-DD sem converter para UTC
+  const getLocalDate = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('');
   const [type, setType] = useState<TransactionType>('expense');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  // Inicializa com data local correta
+  const [date, setDate] = useState(getLocalDate());
   
+  // Status Logic
+  const [isPaid, setIsPaid] = useState(true);
+
   // Installment / Recurring Logic
   const [isRecurring, setIsRecurring] = useState(false);
   const [isInstallmentMode, setIsInstallmentMode] = useState(false);
@@ -56,6 +70,7 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
       setType(initialData.type);
       setDate(initialData.date);
       setIsRecurring(!!initialData.isRecurring);
+      setIsPaid(initialData.isPaid !== undefined ? initialData.isPaid : true); // Default true if legacy data
       
       let rawDesc = initialData.description;
       let detectedSeries = false;
@@ -84,8 +99,12 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
       
       setDescription(rawDesc);
       setIsSeries(detectedSeries);
+    } else {
+        // Novo registro: Se a data for hoje ou passado, default PAGO. Se futuro, default PENDENTE.
+        const today = getLocalDate();
+        setIsPaid(date <= today);
     }
-  }, [initialData]);
+  }, [initialData, date]); // Run status logic when date changes too for new entries
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -108,8 +127,6 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
              finalDescription = `${finalDescription} (Parcela ${currentInstallment})`;
         }
     }
-    // Nota: Se updateSeries for true, passamos a descrição "Limpa" (finalDescription sem sufixo)
-    // para que o App.tsx possa aplicar essa descrição base em todas as parcelas, adicionando seus respectivos sufixos.
 
     const payload = {
       amount: parseFloat(amount),
@@ -117,7 +134,8 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
       description: finalDescription,
       date,
       type,
-      isRecurring
+      isRecurring,
+      isPaid
     };
 
     if (isEditing && onEdit && initialData) {
@@ -131,7 +149,8 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
         payload.type, 
         isInstallmentMode ? installments : 1, 
         payload.isRecurring,
-        currentInstallment
+        currentInstallment,
+        isPaid
       );
     }
     onClose();
@@ -154,7 +173,8 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
   const installmentValue = (parseFloat(amount || '0') / (installments || 1));
   const remainingInstallments = Math.max(0, installments - currentInstallment);
 
-  const expenseCategories = ['Alimentação', 'Transporte', 'Moradia', 'Lazer', 'Saúde', 'Educação', 'Compras', 'Outros'];
+  // Adicionado 'Mercado' explicitamente
+  const expenseCategories = ['Mercado', 'Alimentação', 'Transporte', 'Moradia', 'Lazer', 'Saúde', 'Educação', 'Compras', 'Outros'];
   const incomeCategories = ['Salário', 'Freelance', 'Investimentos', 'Presente', 'Outros'];
 
   return (
@@ -251,7 +271,9 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1">Data Vencimento</label>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">
+                    {type === 'income' ? 'Data Recebimento' : 'Data Vencimento'}
+                  </label>
                   <input
                     type="date"
                     value={date}
@@ -260,6 +282,37 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
                     required
                   />
                 </div>
+              </div>
+
+              {/* Status Toggle (Paid/Pending) */}
+              <div 
+                  onClick={() => setIsPaid(!isPaid)}
+                  className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
+                      isPaid 
+                      ? 'bg-emerald-500/10 border-emerald-500/30' 
+                      : 'bg-slate-800 border-slate-700'
+                  }`}
+              >
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-colors ${
+                      isPaid ? 'bg-emerald-500 text-white' : 'bg-slate-700 text-slate-400'
+                  }`}>
+                      {isPaid ? <CheckCircle2 size={20} /> : <Clock size={20} />}
+                  </div>
+                  <div>
+                      <p className={`font-medium ${isPaid ? 'text-emerald-400' : 'text-slate-300'}`}>
+                          {isPaid 
+                            ? (type === 'income' ? 'Valor Recebido' : 'Conta Paga') 
+                            : (type === 'income' ? 'A Receber' : 'Pagamento Pendente')}
+                      </p>
+                      <p className="text-xs text-slate-500">
+                          {isPaid ? 'Esta transação já foi efetivada.' : 'Marque quando o valor sair/entrar na conta.'}
+                      </p>
+                  </div>
+                  <div className="ml-auto">
+                       <div className={`w-12 h-6 rounded-full p-1 transition-colors ${isPaid ? 'bg-emerald-500' : 'bg-slate-600'}`}>
+                           <div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${isPaid ? 'translate-x-6' : 'translate-x-0'}`} />
+                       </div>
+                  </div>
               </div>
 
               {/* Installments / Recurring Options */}
@@ -301,7 +354,7 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
                               className="w-4 h-4 rounded bg-slate-700 border-slate-500 text-indigo-500 focus:ring-indigo-500"
                            />
                        </div>
-                       <p className="text-[10px] text-slate-400 mt-1">
+                       <p className="text--[10px] text-slate-400 mt-1">
                           Se marcado, o valor e a categoria serão atualizados em todos os lançamentos futuros desta série.
                        </p>
                     </div>
@@ -364,7 +417,7 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
                                    <div className="mt-3 flex items-start gap-2 text-xs text-emerald-400">
                                       <Info size={14} className="shrink-0 mt-0.5" />
                                       <p>
-                                        O sistema criará automaticamente as <strong>{remainingInstallments}</strong> parcelas futuras nos próximos meses.
+                                        O sistema criará automaticamente as <strong>{remainingInstallments}</strong> parcelas futuras (marcadas como pendentes).
                                       </p>
                                    </div>
                                 )}
