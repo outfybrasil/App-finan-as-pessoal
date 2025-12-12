@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { generateFinancialInsights } from '../services/geminiService';
 import { Transaction, Budget, Goal, Insight } from '../types';
 import { Sparkles, Lightbulb, TrendingUp, AlertOctagon, Loader2, CheckCircle2, X, ArrowRight } from 'lucide-react';
@@ -28,13 +28,7 @@ export const Insights: React.FC<InsightsProps> = ({ transactions, budgets, goals
     }
   };
 
-  // Auto-fetch on mount if empty
-  useEffect(() => {
-    if (insights.length === 0) {
-      fetchInsights();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // REMOVIDO: useEffect de auto-fetch. Evita chamadas ao montar o componente.
 
   const getIcon = (type: Insight['type']) => {
     switch (type) {
@@ -73,16 +67,18 @@ export const Insights: React.FC<InsightsProps> = ({ transactions, budgets, goals
 
       <div className="flex justify-between items-center pt-8 border-t border-slate-800">
          <h3 className="text-xl font-bold text-white">Insights Sugeridos</h3>
-         <Button 
-            size="sm"
-            onClick={fetchInsights} 
-            disabled={loading}
-            className="flex items-center gap-2"
-            variant="secondary"
-          >
-            {loading ? <Loader2 className="animate-spin" size={14}/> : <Sparkles size={14} />}
-            {loading ? 'Analisando...' : 'Atualizar'}
-          </Button>
+         {insights.length > 0 && (
+             <Button 
+                size="sm"
+                onClick={fetchInsights} 
+                disabled={loading}
+                className="flex items-center gap-2"
+                variant="secondary"
+            >
+                {loading ? <Loader2 className="animate-spin" size={14}/> : <Sparkles size={14} />}
+                {loading ? 'Analisando...' : 'Atualizar'}
+            </Button>
+         )}
       </div>
 
       <div className="grid gap-4">
@@ -112,9 +108,17 @@ export const Insights: React.FC<InsightsProps> = ({ transactions, budgets, goals
           </div>
         ))}
         
-        {!loading && insights.length === 0 && (
-          <div className="text-center p-8 bg-slate-800/50 rounded-2xl border border-slate-800 border-dashed">
-            <p className="text-slate-500">Nenhum insight gerado ainda. Registre mais transações para alimentar a IA.</p>
+        {insights.length === 0 && (
+          <div className="text-center p-8 bg-slate-800/50 rounded-2xl border border-slate-800 border-dashed flex flex-col items-center">
+            <p className="text-slate-500 mb-4">Clique abaixo para gerar uma análise profunda dos seus dados recentes.</p>
+            <Button 
+                onClick={fetchInsights} 
+                disabled={loading}
+                className="flex items-center gap-2"
+            >
+                {loading ? <Loader2 className="animate-spin" size={20}/> : <Sparkles size={20} />}
+                {loading ? 'Gerando Análise...' : 'Gerar Insights com IA'}
+            </Button>
           </div>
         )}
       </div>

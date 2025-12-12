@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Transaction } from '../types';
 import { generateAuditAdvice, AuditAdvice } from '../services/geminiService';
 import { PieChart, Loader2, RefreshCw, AlertCircle, CheckCircle } from 'lucide-react';
@@ -44,17 +44,18 @@ export const FinancialAudit: React.FC<FinancialAuditProps> = ({ transactions }) 
   const fetchAdvice = async () => {
     if (income === 0) return;
     setLoading(true);
-    const result = await generateAuditAdvice(income, needs, wants, savings);
-    setAdvice(result);
-    setLoading(false);
+    try {
+        const result = await generateAuditAdvice(income, needs, wants, savings);
+        setAdvice(result);
+    } catch (error) {
+        console.error("Erro ao gerar auditoria", error);
+    } finally {
+        setLoading(false);
+    }
   };
 
-  useEffect(() => {
-    // Busca automática se tiver dados e ainda não tiver conselho
-    if (income > 0 && !advice && !loading) {
-        fetchAdvice();
-    }
-  }, [income]); // Re-executa se a renda mudar (novos dados)
+  // REMOVIDO: useEffect que causava loop de requisições.
+  // A chamada agora é exclusivamente manual pelo botão.
 
   if (income === 0) {
       return (
@@ -131,14 +132,22 @@ export const FinancialAudit: React.FC<FinancialAuditProps> = ({ transactions }) 
                     <Loader2 className="animate-spin" size={16} /> Analisando dados...
                 </div>
             ) : advice ? (
-                <div className="flex items-start gap-3 animate-in fade-in slide-in-from-bottom-2">
-                    <div className="shrink-0 mt-1">
-                        {advice.score >= 7 ? <CheckCircle className="text-emerald-500" size={20}/> : <AlertCircle className="text-amber-500" size={20}/>}
+                <div className="flex flex-col gap-3 animate-in fade-in slide-in-from-bottom-2">
+                    <div className="flex items-start gap-3">
+                        <div className="shrink-0 mt-1">
+                            {advice.score >= 7 ? <CheckCircle className="text-emerald-500" size={20}/> : <AlertCircle className="text-amber-500" size={20}/>}
+                        </div>
+                        <div>
+                            <p className="text-slate-300 text-sm italic leading-relaxed">"{advice.message}"</p>
+                            <p className="text-[10px] text-slate-500 mt-1 font-medium uppercase tracking-wider">— Seu Consultor IA</p>
+                        </div>
                     </div>
-                    <div>
-                        <p className="text-slate-300 text-sm italic leading-relaxed">"{advice.message}"</p>
-                        <p className="text-[10px] text-slate-500 mt-1 font-medium uppercase tracking-wider">— Seu Consultor IA</p>
-                    </div>
+                     <button 
+                        onClick={fetchAdvice}
+                        className="text-xs text-slate-500 hover:text-white underline mt-2 self-end"
+                     >
+                        Atualizar Análise
+                     </button>
                 </div>
             ) : (
                  <button 
