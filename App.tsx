@@ -21,10 +21,8 @@ const App: React.FC = () => {
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [loading, setLoading] = useState(true);
   
-  // Privacy Mode State
   const [privacyMode, setPrivacyMode] = useState(false);
   
-  // Date Filter State
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
   const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
@@ -33,22 +31,17 @@ const App: React.FC = () => {
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
 
-  // State for editing and pre-filling
   const [transactionToEdit, setTransactionToEdit] = useState<Transaction | null>(null);
 
-  // Helper para gerar IDs simples
   const generateId = () => Date.now().toString(36) + Math.random().toString(36).substr(2);
 
-  // Gerenciar Sessão
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setAuthLoading(false);
     });
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setAuthLoading(false);
     });
@@ -56,7 +49,6 @@ const App: React.FC = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Carregar dados iniciais (Apenas se tiver sessão)
   useEffect(() => {
     if (!session) return;
 
@@ -82,11 +74,9 @@ const App: React.FC = () => {
     loadData();
   }, [session]);
 
-  // Filter transactions when date or list changes
   useEffect(() => {
     const filtered = allTransactions.filter(t => {
       const tDate = new Date(t.date);
-      // Ajuste de fuso horário simples para garantir que a comparação de mês funcione
       return tDate.getUTCMonth() === currentMonth.getMonth() && 
              tDate.getUTCFullYear() === currentMonth.getFullYear();
     });
@@ -105,24 +95,17 @@ const App: React.FC = () => {
       isPaid: boolean = true
   ) => {
     
-    // Prepare transaction objects
     const newTransactions: Omit<Transaction, 'id'>[] = [];
-    // Gerar um Group ID se for uma série (mais de 1 parcela ou recorrente)
     const groupId = (installments > 1 || isRecurring) ? `grp_${generateId()}` : undefined;
 
-    // Lógica 1: Parcelamento (Apenas Despesas, divide o valor)
     if (type === 'expense' && installments > 1) {
         const installmentValue = amount / installments;
         const startDate = new Date(date);
-
         let monthOffset = 0;
 
         for (let i = currentInstallment; i <= installments; i++) {
             const currentDate = new Date(startDate);
             currentDate.setMonth(startDate.getMonth() + monthOffset);
-            
-            // Apenas a parcela atual (primeira criada) respeita o status "isPaid" selecionado no form
-            // Parcelas futuras são geradas como Pendentes por padrão
             const isThisInstallmentPaid = (i === currentInstallment) ? isPaid : false;
 
             newTransactions.push({
@@ -138,31 +121,27 @@ const App: React.FC = () => {
             monthOffset++;
         }
     } 
-    // Lógica 2: Recorrência Fixa (Receita ou Despesa, repete valor integral por 12 meses)
     else if (isRecurring) {
         const startDate = new Date(date);
-        const RECURRENCE_HORIZON = 12; // Gera automaticamente para 1 ano
+        const RECURRENCE_HORIZON = 12; 
 
         for (let i = 0; i < RECURRENCE_HORIZON; i++) {
             const currentDate = new Date(startDate);
             currentDate.setMonth(startDate.getMonth() + i);
-            
-            // Apenas o primeiro item respeita o status, futuros são pendentes
             const isThisItemPaid = (i === 0) ? isPaid : false;
 
             newTransactions.push({
                 groupId,
-                amount: amount, // Valor integral
+                amount: amount,
                 category,
-                description: description, // Descrição limpa
+                description: description,
                 date: currentDate.toISOString().split('T')[0],
                 type,
-                isRecurring: true, // Marcado visualmente como fixo
+                isRecurring: true,
                 isPaid: isThisItemPaid
             });
         }
     }
-    // Lógica 3: Transação Única
     else {
         newTransactions.push({
             amount,
@@ -183,33 +162,25 @@ const App: React.FC = () => {
         alert("Erro ao salvar no Supabase.");
       }
     } else {
-      // Local fallback
       const localAdded = newTransactions.map((t, i) => ({ ...t, id: generateId() + i } as Transaction));
       setAllTransactions(prev => [...localAdded, ...prev]);
     }
   };
 
   const handleEditTransaction = async (id: string, updates: any, updateSeries: boolean = false) => {
-      // 1. Identificar transações a serem atualizadas
       let transactionsToUpdate: {id: string, data: any}[] = [];
 
       if (!updateSeries) {
-          // Atualização simples (apenas 1)
           transactionsToUpdate.push({ id, data: updates });
       } else {
-          // Atualização em lote
           const original = allTransactions.find(t => t.id === id);
           if (!original) return;
 
-          // Encontrar irmãs
           let siblings: Transaction[] = [];
 
           if (original.groupId) {
-              // Se tiver ID de grupo, é fácil
               siblings = allTransactions.filter(t => t.groupId === original.groupId);
           } else {
-              // Heurística para dados legados (sem groupId):
-              // Mesma categoria, mesmo tipo, descrição similar
               const cleanDesc = original.description.replace(/\s\(\d+\/\d+\)$/, '').replace(/\s\(Parcela \d+\)$/, '').trim();
               siblings = allTransactions.filter(t => 
                  t.type === original.type && 
@@ -218,40 +189,34 @@ const App: React.FC = () => {
               );
           }
 
-          // Preparar updates para cada irmã
           siblings.forEach(sibling => {
-             // Preservar a numeração da parcela se existir na descrição original da irmã
-             let newDescription = updates.description; // Descrição base vinda do form
+             let newDescription = updates.description;
              
              const matchSplit = sibling.description.match(/\s\(\d+\/\d+\)$/);
              const matchParcela = sibling.description.match(/\s\(Parcela \d+\)$/);
              
              if (matchSplit) {
-                 newDescription += matchSplit[0]; // Reanexa " (1/10)"
+                 newDescription += matchSplit[0];
              } else if (matchParcela) {
-                 newDescription += matchParcela[0]; // Reanexa " (Parcela 1)"
+                 newDescription += matchParcela[0];
              }
 
-             // Não alteramos a DATA das outras parcelas, apenas Valor, Categoria, Descrição, Tipo
              const siblingUpdates = {
                  ...updates,
                  description: newDescription,
-                 date: sibling.id === id ? updates.date : sibling.date, // Mantém a data original das outras, altera só a atual se solicitado
-                 isPaid: sibling.id === id ? updates.isPaid : sibling.isPaid // Mantém status original das outras, altera só a atual
+                 date: sibling.id === id ? updates.date : sibling.date,
+                 isPaid: sibling.id === id ? updates.isPaid : sibling.isPaid
              };
 
              transactionsToUpdate.push({ id: sibling.id, data: siblingUpdates });
           });
       }
 
-      // 2. Executar Updates
       if (supabase) {
-          // Nota: Idealmente faríamos um batch update ou stored procedure, mas faremos loop aqui por simplicidade
           const promises = transactionsToUpdate.map(t => financeService.updateTransaction(t.id, t.data));
           const results = await Promise.all(promises);
           
           if (results.some(r => r !== null)) {
-              // Atualiza estado local com os resultados
               setAllTransactions(prev => {
                   const newMap = new Map<string, Transaction>(prev.map(t => [t.id, t] as [string, Transaction]));
                   results.forEach(updated => {
@@ -279,12 +244,10 @@ const App: React.FC = () => {
   const handleToggleStatus = async (t: Transaction) => {
      const newStatus = !t.isPaid;
      
-     // Optimistic update locally
      setAllTransactions(prev => prev.map(item => 
         item.id === t.id ? { ...item, isPaid: newStatus } : item
      ));
 
-     // Sync with DB
      if (supabase) {
          await financeService.updateTransaction(t.id, { isPaid: newStatus });
      }
@@ -302,8 +265,6 @@ const App: React.FC = () => {
           setAllTransactions(prev => prev.filter(t => t.id !== id));
       }
   };
-
-  // --- Goal Handlers ---
 
   const handleAddGoal = async (goalData: Omit<Goal, 'id'>) => {
     if(supabase) {
@@ -339,13 +300,11 @@ const App: React.FC = () => {
       }
   };
 
-
   const openEditModal = (t: Transaction) => {
       setTransactionToEdit(t);
       setShowQuickAdd(true);
   };
 
-  // --- Shopping List Handler ---
   const handleFinishShopping = (total: number) => {
       const preFill: any = {
           amount: total,
@@ -359,7 +318,6 @@ const App: React.FC = () => {
       setTransactionToEdit({ ...preFill, id: '' });
       setShowQuickAdd(true);
   };
-
 
   const navItems = [
     { view: View.DASHBOARD, label: 'Início', icon: LayoutDashboard },
@@ -389,43 +347,42 @@ const App: React.FC = () => {
       <div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-400">
         <div className="animate-pulse flex flex-col items-center gap-4">
           <div className="w-12 h-12 bg-emerald-500 rounded-xl"></div>
-          <p>Carregando seus dados...</p>
+          <p>Sincronizando dados...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col md:flex-row">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col md:flex-row font-sans">
       
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex flex-col w-64 border-r border-slate-800 bg-slate-900 p-6 fixed h-full z-10">
-        <div className="flex items-center gap-3 mb-10">
-          <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center">
-            <span className="font-bold text-white text-lg">M</span>
+      <aside className="hidden md:flex flex-col w-64 border-r border-slate-800 bg-slate-900/50 backdrop-blur-sm p-6 fixed h-full z-20">
+        <div className="flex items-center gap-3 mb-10 pl-2">
+          <div className="w-8 h-8 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-lg flex items-center justify-center shadow-lg shadow-emerald-500/20">
+            <span className="font-bold text-white text-lg">F</span>
           </div>
-          <span className="font-bold text-xl tracking-tight">Minhas Finanças</span>
+          <span className="font-bold text-xl tracking-tight text-white">Fluxo</span>
         </div>
         
-        <nav className="space-y-2 flex-1">
+        <nav className="space-y-1.5 flex-1">
           {navItems.map((item) => (
             <button
               key={item.view}
               onClick={() => setCurrentView(item.view)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${
                 currentView === item.view 
-                  ? 'bg-emerald-500/10 text-emerald-500 font-medium' 
+                  ? 'bg-emerald-500/10 text-emerald-400 font-medium' 
                   : 'text-slate-400 hover:text-white hover:bg-slate-800'
               }`}
             >
-              <item.icon size={20} />
+              <item.icon size={20} className={currentView === item.view ? 'text-emerald-400' : 'text-slate-500 group-hover:text-slate-300'} />
               {item.label}
             </button>
           ))}
         </nav>
 
         <div className="mt-auto space-y-4">
-            {/* Privacy Toggle Desktop */}
             <button 
                 onClick={() => setPrivacyMode(!privacyMode)}
                 className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all"
@@ -443,7 +400,6 @@ const App: React.FC = () => {
             </div>
             )}
 
-            {/* Logout Button */}
             <button 
               onClick={() => supabase.auth.signOut()}
               className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-all"
@@ -454,7 +410,7 @@ const App: React.FC = () => {
 
             <button 
             onClick={() => { setTransactionToEdit(null); setShowQuickAdd(true); }}
-            className="bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl py-3 px-4 flex items-center justify-center gap-2 font-medium transition-colors w-full"
+            className="bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl py-3.5 px-4 flex items-center justify-center gap-2 font-medium transition-all shadow-lg shadow-emerald-500/20 w-full hover:shadow-emerald-500/30 hover:-translate-y-0.5"
             >
             <Plus size={20} />
             Registrar
@@ -463,25 +419,28 @@ const App: React.FC = () => {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 md:ml-64 p-6 overflow-y-auto min-h-screen">
+      <main className="flex-1 md:ml-64 p-4 md:p-8 overflow-y-auto min-h-screen relative bg-slate-950">
+        {/* Decorative Background Elements */}
+        <div className="fixed top-0 left-64 right-0 h-64 bg-emerald-900/5 blur-3xl pointer-events-none" />
+
         {/* Mobile Header with Logout */}
-        <div className="md:hidden flex justify-between items-center mb-6">
+        <div className="md:hidden flex justify-between items-center mb-6 sticky top-0 bg-slate-950/90 backdrop-blur-md z-30 py-4 -mx-4 px-4 border-b border-slate-800/50">
            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 bg-emerald-500 rounded flex items-center justify-center">
-                <span className="font-bold text-white text-xs">M</span>
+              <div className="w-8 h-8 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-lg flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                <span className="font-bold text-white text-lg">F</span>
               </div>
-              <span className="font-bold text-sm tracking-tight">Minhas Finanças</span>
+              <span className="font-bold text-lg tracking-tight text-white">Fluxo</span>
            </div>
            <button 
               onClick={() => supabase.auth.signOut()}
               className="p-2 bg-slate-900 rounded-lg text-rose-400 border border-slate-800 hover:bg-slate-800"
               title="Sair"
            >
-              <LogOut size={16} />
+              <LogOut size={20} />
            </button>
         </div>
 
-        <div className="max-w-6xl mx-auto animate-in fade-in duration-500">
+        <div className="max-w-6xl mx-auto animate-in fade-in duration-500 relative z-10">
           
           {currentView === View.DASHBOARD && (
             <Dashboard 
@@ -491,12 +450,12 @@ const App: React.FC = () => {
                 onMonthChange={setCurrentMonth}
                 onEditTransaction={openEditModal}
                 onToggleStatus={handleToggleStatus}
-                privacyMode={privacyMode} // Pass Prop
+                privacyMode={privacyMode}
             />
           )}
           {currentView === View.CALENDAR && (
             <CalendarView 
-                transactions={filteredTransactions} // Uses filtered for current month view logic inside
+                transactions={filteredTransactions}
                 currentMonth={currentMonth}
                 onMonthChange={setCurrentMonth}
                 onEditTransaction={openEditModal}
@@ -515,7 +474,7 @@ const App: React.FC = () => {
                 onAddGoal={handleAddGoal}
                 onUpdateGoal={handleUpdateGoal}
                 onDeleteGoal={handleDeleteGoal}
-                privacyMode={privacyMode} // Pass Prop
+                privacyMode={privacyMode}
             />
           )}
           {currentView === View.REPORTS && <Reports transactions={allTransactions} />}
@@ -524,33 +483,32 @@ const App: React.FC = () => {
       </main>
 
       {/* Mobile Navigation */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 px-2 py-4 flex justify-between items-center z-40 safe-area-pb">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900/90 backdrop-blur-lg border-t border-slate-800 px-2 py-3 flex justify-between items-center z-40 safe-area-pb shadow-[0_-5px_20px_rgba(0,0,0,0.3)]">
         {navItems.map((item) => (
           <button
             key={item.view}
             onClick={() => setCurrentView(item.view)}
-            className={`flex flex-col items-center gap-1 min-w-[50px] ${
-              currentView === item.view ? 'text-emerald-500' : 'text-slate-500'
+            className={`flex flex-col items-center gap-1 min-w-[50px] p-1 rounded-lg transition-colors ${
+              currentView === item.view ? 'text-emerald-400' : 'text-slate-500'
             }`}
           >
-            <item.icon size={22} />
-            <span className="text-[9px] font-medium">{item.label}</span>
+            <item.icon size={24} strokeWidth={currentView === item.view ? 2.5 : 2} />
+            <span className={`text-[10px] font-medium ${currentView === item.view ? 'opacity-100' : 'opacity-70'}`}>{item.label}</span>
           </button>
         ))}
-         {/* Privacy Toggle Mobile */}
          <button
             onClick={() => setPrivacyMode(!privacyMode)}
-            className="flex flex-col items-center gap-1 min-w-[50px] text-slate-500 active:text-white"
+            className="flex flex-col items-center gap-1 min-w-[50px] p-1 text-slate-500 active:text-white"
           >
-            {privacyMode ? <EyeOff size={22} /> : <Eye size={22} />}
-            <span className="text-[9px] font-medium">Privacidade</span>
+            {privacyMode ? <EyeOff size={24} /> : <Eye size={24} />}
+            <span className="text-[10px] font-medium opacity-70">Privacidade</span>
           </button>
       </div>
 
       {/* Mobile Floating Action Button (FAB) */}
       <button 
         onClick={() => { setTransactionToEdit(null); setShowQuickAdd(true); }}
-        className="md:hidden fixed bottom-20 right-6 w-14 h-14 bg-emerald-500 rounded-full shadow-lg shadow-emerald-500/30 flex items-center justify-center text-white z-40 active:scale-95 transition-transform"
+        className="md:hidden fixed bottom-20 right-6 w-14 h-14 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-full shadow-lg shadow-emerald-500/40 flex items-center justify-center text-white z-40 active:scale-95 transition-transform"
       >
         <Plus size={28} />
       </button>

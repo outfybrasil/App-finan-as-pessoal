@@ -1,10 +1,17 @@
 import { supabase } from '../lib/supabaseClient';
 import { Transaction, Budget, Goal, TransactionType } from '../types';
 
+// Helper para pegar o usuário atual
+const getCurrentUserId = async () => {
+  const { data: { user } } = await supabase.auth.getUser();
+  return user?.id;
+};
+
 export const financeService = {
   async getTransactions(): Promise<Transaction[]> {
     if (!supabase) return [];
     
+    // O RLS do Supabase deve filtrar automaticamente, mas é boa prática garantir a sessão
     const { data, error } = await supabase
       .from('transactions')
       .select('*')
@@ -16,47 +23,49 @@ export const financeService = {
     }
     
     return (data || []).map((t: any) => ({
-      id: String(t.id), // Force string ID
-      groupId: t.group_id, // Mapeia snake_case do banco (se existir)
+      id: String(t.id),
+      groupId: t.group_id,
       amount: Number(t.amount),
       category: t.category,
       date: t.date,
       description: t.description,
       type: t.type,
-      isPaid: t.is_paid // Mapeia status de pagamento
+      isPaid: t.is_paid
     }));
   },
 
   async addTransaction(transaction: Omit<Transaction, 'id'> | Omit<Transaction, 'id'>[]): Promise<Transaction[] | null> {
     if (!supabase) return null;
 
+    const userId = await getCurrentUserId();
+    if (!userId) {
+        console.error("Usuário não autenticado");
+        return null;
+    }
+
     const rawPayload = Array.isArray(transaction) ? transaction : [transaction];
     
-    // Sanitização e mapeamento para snake_case
     const payload = rawPayload.map(t => ({
+        user_id: userId, // Vincula ao usuário
         amount: t.amount,
         category: t.category,
         date: t.date,
         description: t.description,
         type: t.type,
-        is_paid: t.isPaid
-        // group_id: t.groupId 
+        is_paid: t.isPaid,
+        group_id: t.groupId 
     }));
 
-    // Tenta inserir
     let result = await supabase
       .from('transactions')
       .insert(payload)
       .select();
 
-    // Fallback: Se der erro de coluna inexistente, tenta inserir sem o campo is_paid
-    if (result.error && (result.error.message.includes('is_paid') || result.error.message.includes('column "is_paid" of relation "transactions" does not exist'))) {
-      console.warn('Coluna is_paid não detectada no Supabase. Salvando sem este campo. Execute "alter table transactions add column is_paid boolean default true;" no banco.');
-      const fallbackPayload = payload.map(({ is_paid, ...rest }) => rest);
-      result = await supabase
-        .from('transactions')
-        .insert(fallbackPayload)
-        .select();
+    // Fallback para caso a coluna user_id não exista (modo legado/desenvolvimento local sem migration)
+    if (result.error && (result.error.message.includes('user_id') || result.error.message.includes('column "user_id"'))) {
+      console.warn('Coluna user_id não detectada. Tentando salvar sem vínculo (atenção: dados podem ficar públicos ou falhar dependendo do RLS).');
+      const fallbackPayload = payload.map(({ user_id, ...rest }) => rest);
+      result = await supabase.from('transactions').insert(fallbackPayload).select();
     }
 
     if (result.error) {
@@ -79,7 +88,6 @@ export const financeService = {
   async updateTransaction(id: string, updates: Partial<Omit<Transaction, 'id'>>): Promise<Transaction | null> {
     if (!supabase) return null;
 
-    // Sanitização e mapeamento
     const sanitizedUpdates: any = {};
     if (updates.amount !== undefined) sanitizedUpdates.amount = updates.amount;
     if (updates.category !== undefined) sanitizedUpdates.category = updates.category;
@@ -87,9 +95,6 @@ export const financeService = {
     if (updates.date !== undefined) sanitizedUpdates.date = updates.date;
     if (updates.type !== undefined) sanitizedUpdates.type = updates.type;
     if (updates.isPaid !== undefined) sanitizedUpdates.is_paid = updates.isPaid;
-    
-    // REMOVIDO group_id update
-    // if (updates.groupId !== undefined) sanitizedUpdates.group_id = updates.groupId;
 
     let result = await supabase
         .from('transactions')
@@ -97,18 +102,6 @@ export const financeService = {
         .eq('id', id)
         .select()
         .single();
-
-    // Fallback: Se der erro de coluna inexistente, tenta atualizar sem is_paid
-    if (result.error && (result.error.message.includes('is_paid') || result.error.message.includes('column "is_paid" of relation "transactions" does not exist'))) {
-         console.warn('Coluna is_paid não detectada no Supabase. Atualizando sem este campo.');
-         delete sanitizedUpdates.is_paid;
-         result = await supabase
-            .from('transactions')
-            .update(sanitizedUpdates)
-            .eq('id', id)
-            .select()
-            .single();
-    }
 
     if (result.error) {
         console.error('Erro ao atualizar transação:', result.error.message || result.error);
@@ -147,14 +140,9 @@ export const financeService = {
   async getBudgets(): Promise<Budget[]> {
     if (!supabase) return [];
 
-    const { data, error } = await supabase
-      .from('budgets')
-      .select('*');
+    const { data, error } = await supabase.from('budgets').select('*');
 
-    if (error) {
-      console.error('Erro ao buscar orçamentos:', error.message || error);
-      return [];
-    }
+    if (error) return [];
     
     return (data || []).map((b: any) => ({
         id: String(b.id),
@@ -168,14 +156,9 @@ export const financeService = {
   async getGoals(): Promise<Goal[]> {
     if (!supabase) return [];
 
-    const { data, error } = await supabase
-      .from('goals')
-      .select('*');
+    const { data, error } = await supabase.from('goals').select('*');
 
-    if (error) {
-      console.error('Erro ao buscar metas:', error.message || error);
-      return [];
-    }
+    if (error) return [];
     
     return (data || []).map((g: any) => ({
         id: String(g.id),
@@ -188,10 +171,14 @@ export const financeService = {
 
   async addGoal(goal: Omit<Goal, 'id'>): Promise<Goal | null> {
     if (!supabase) return null;
+    
+    const userId = await getCurrentUserId();
+    if (!userId) return null;
 
     const { data, error } = await supabase
       .from('goals')
       .insert([{
+        user_id: userId,
         name: goal.name,
         target_amount: goal.targetAmount,
         current_amount: goal.currentAmount,
@@ -217,7 +204,6 @@ export const financeService = {
   async updateGoal(id: string, updates: Partial<Omit<Goal, 'id'>>): Promise<Goal | null> {
     if (!supabase) return null;
 
-    // Mapeamento reverso para snake_case
     const dbUpdates: any = {};
     if (updates.name) dbUpdates.name = updates.name;
     if (updates.deadline) dbUpdates.deadline = updates.deadline;
@@ -231,10 +217,7 @@ export const financeService = {
       .select()
       .single();
 
-    if (error) {
-      console.error('Erro ao atualizar meta:', error.message || error);
-      return null;
-    }
+    if (error) return null;
 
     return {
         id: String(data.id),
@@ -247,16 +230,7 @@ export const financeService = {
 
   async deleteGoal(id: string): Promise<boolean> {
     if (!supabase) return false;
-
-    const { error } = await supabase
-      .from('goals')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
-      console.error('Erro ao deletar meta:', error.message || error);
-      return false;
-    }
-    return true;
+    const { error } = await supabase.from('goals').delete().eq('id', id);
+    return !error;
   }
 };
