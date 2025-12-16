@@ -1,236 +1,151 @@
 import { supabase } from '../lib/supabaseClient';
-import { Transaction, Budget, Goal, TransactionType } from '../types';
+import { Transaction, Budget, Goal } from '../types';
 
-// Helper para pegar o usuário atual
-const getCurrentUserId = async () => {
-  const { data: { user } } = await supabase.auth.getUser();
-  return user?.id;
+// Helper to map DB snake_case columns to application camelCase properties
+const mapTransactionFromDb = (item: any): Transaction => ({
+  ...item,
+  amount: Number(item.amount), // Garante que é número para evitar erros de cálculo
+  groupId: item.group_id ?? item.groupId, // Tenta snake_case primeiro, fallback para camelCase
+  isRecurring: item.is_recurring ?? item.isRecurring,
+  isPaid: item.is_paid ?? item.isPaid ?? true, 
+  account: item.account ?? 'Carteira', // Default para Carteira se null
+});
+
+// Helper to map application properties to DB snake_case columns
+const mapTransactionToDb = (item: any) => {
+  const { groupId, isRecurring, isPaid, account, id, ...rest } = item;
+  
+  // Cria objeto com chaves em snake_case para o banco
+  const payload: any = { ...rest };
+  
+  // Apenas adiciona ao payload se não for undefined
+  if (groupId !== undefined) payload.group_id = groupId;
+  if (isRecurring !== undefined) payload.is_recurring = isRecurring;
+  if (isPaid !== undefined) payload.is_paid = isPaid;
+  if (account !== undefined) payload.account = account;
+
+  return payload;
 };
 
 export const financeService = {
   async getTransactions(): Promise<Transaction[]> {
-    if (!supabase) return [];
-    
-    // O RLS do Supabase deve filtrar automaticamente, mas é boa prática garantir a sessão
     const { data, error } = await supabase
       .from('transactions')
       .select('*')
       .order('date', { ascending: false });
-
+      
     if (error) {
-      console.error('Erro ao buscar transações:', error.message || error);
-      return [];
+        console.error('Error fetching transactions:', JSON.stringify(error, null, 2));
+        return [];
     }
-    
-    return (data || []).map((t: any) => ({
-      id: String(t.id),
-      groupId: t.group_id,
-      amount: Number(t.amount),
-      category: t.category,
-      date: t.date,
-      description: t.description,
-      type: t.type,
-      isPaid: t.is_paid
-    }));
+    return (data || []).map(mapTransactionFromDb);
   },
 
-  async addTransaction(transaction: Omit<Transaction, 'id'> | Omit<Transaction, 'id'>[]): Promise<Transaction[] | null> {
-    if (!supabase) return null;
-
-    const userId = await getCurrentUserId();
-    if (!userId) {
-        console.error("Usuário não autenticado");
+  async addTransaction(transactions: Omit<Transaction, 'id'>[]): Promise<Transaction[] | null> {
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+        console.error("User not authenticated");
         return null;
     }
 
-    const rawPayload = Array.isArray(transaction) ? transaction : [transaction];
-    
-    const payload = rawPayload.map(t => ({
-        user_id: userId, // Vincula ao usuário
-        amount: t.amount,
-        category: t.category,
-        date: t.date,
-        description: t.description,
-        type: t.type,
-        is_paid: t.isPaid,
-        group_id: t.groupId 
+    const payload = transactions.map(t => ({
+        ...mapTransactionToDb(t),
+        user_id: user.id
     }));
 
-    let result = await supabase
+    const { data, error } = await supabase
       .from('transactions')
       .insert(payload)
       .select();
-
-    // Fallback para caso a coluna user_id não exista (modo legado/desenvolvimento local sem migration)
-    if (result.error && (result.error.message.includes('user_id') || result.error.message.includes('column "user_id"'))) {
-      console.warn('Coluna user_id não detectada. Tentando salvar sem vínculo (atenção: dados podem ficar públicos ou falhar dependendo do RLS).');
-      const fallbackPayload = payload.map(({ user_id, ...rest }) => rest);
-      result = await supabase.from('transactions').insert(fallbackPayload).select();
-    }
-
-    if (result.error) {
-      console.error('Erro ao adicionar transação:', result.error.message || result.error);
-      return null;
-    }
-    
-    return (result.data || []).map((d: any) => ({
-      id: String(d.id),
-      groupId: d.group_id,
-      amount: Number(d.amount),
-      category: d.category,
-      date: d.date,
-      description: d.description,
-      type: d.type,
-      isPaid: d.is_paid
-    }));
-  },
-
-  async updateTransaction(id: string, updates: Partial<Omit<Transaction, 'id'>>): Promise<Transaction | null> {
-    if (!supabase) return null;
-
-    const sanitizedUpdates: any = {};
-    if (updates.amount !== undefined) sanitizedUpdates.amount = updates.amount;
-    if (updates.category !== undefined) sanitizedUpdates.category = updates.category;
-    if (updates.description !== undefined) sanitizedUpdates.description = updates.description;
-    if (updates.date !== undefined) sanitizedUpdates.date = updates.date;
-    if (updates.type !== undefined) sanitizedUpdates.type = updates.type;
-    if (updates.isPaid !== undefined) sanitizedUpdates.is_paid = updates.isPaid;
-
-    let result = await supabase
-        .from('transactions')
-        .update(sanitizedUpdates)
-        .eq('id', id)
-        .select()
-        .single();
-
-    if (result.error) {
-        console.error('Erro ao atualizar transação:', result.error.message || result.error);
+      
+    if (error) {
+        console.error('Error adding transaction:', JSON.stringify(error, null, 2));
         return null;
     }
-
-    const data = result.data;
-
-    return {
-        id: String(data.id),
-        groupId: data.group_id,
-        amount: Number(data.amount),
-        category: data.category,
-        date: data.date,
-        description: data.description,
-        type: data.type,
-        isPaid: data.is_paid
-    };
+    return (data || []).map(mapTransactionFromDb);
   },
 
-  async deleteTransaction(id: string): Promise<boolean> {
-      if (!supabase) return false;
+  async updateTransaction(id: string, updates: Partial<Transaction>): Promise<Transaction | null> {
+    const { error: errAuth } = await supabase.auth.getUser();
+    if (errAuth) return null;
 
-      const { error } = await supabase
-          .from('transactions')
-          .delete()
-          .eq('id', id);
-
-      if (error) {
-          console.error('Erro ao deletar:', error.message || error);
-          return false;
-      }
-      return true;
-  },
-
-  async getBudgets(): Promise<Budget[]> {
-    if (!supabase) return [];
-
-    const { data, error } = await supabase.from('budgets').select('*');
-
-    if (error) return [];
-    
-    return (data || []).map((b: any) => ({
-        id: String(b.id),
-        category: b.category,
-        limit: Number(b.limit),
-        spent: Number(b.spent),
-        cumulative: b.cumulative
-    }));
-  },
-
-  async getGoals(): Promise<Goal[]> {
-    if (!supabase) return [];
-
-    const { data, error } = await supabase.from('goals').select('*');
-
-    if (error) return [];
-    
-    return (data || []).map((g: any) => ({
-        id: String(g.id),
-        name: g.name,
-        targetAmount: Number(g.target_amount),
-        currentAmount: Number(g.current_amount),
-        deadline: g.deadline
-    }));
-  },
-
-  async addGoal(goal: Omit<Goal, 'id'>): Promise<Goal | null> {
-    if (!supabase) return null;
-    
-    const userId = await getCurrentUserId();
-    if (!userId) return null;
+    const dbUpdates = mapTransactionToDb(updates);
 
     const { data, error } = await supabase
-      .from('goals')
-      .insert([{
-        user_id: userId,
-        name: goal.name,
-        target_amount: goal.targetAmount,
-        current_amount: goal.currentAmount,
-        deadline: goal.deadline
-      }])
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Erro ao criar meta:', error.message || error);
-      return null;
-    }
-
-    return {
-        id: String(data.id),
-        name: data.name,
-        targetAmount: Number(data.target_amount),
-        currentAmount: Number(data.current_amount),
-        deadline: data.deadline
-    };
-  },
-
-  async updateGoal(id: string, updates: Partial<Omit<Goal, 'id'>>): Promise<Goal | null> {
-    if (!supabase) return null;
-
-    const dbUpdates: any = {};
-    if (updates.name) dbUpdates.name = updates.name;
-    if (updates.deadline) dbUpdates.deadline = updates.deadline;
-    if (updates.targetAmount !== undefined) dbUpdates.target_amount = updates.targetAmount;
-    if (updates.currentAmount !== undefined) dbUpdates.current_amount = updates.currentAmount;
-
-    const { data, error } = await supabase
-      .from('goals')
+      .from('transactions')
       .update(dbUpdates)
       .eq('id', id)
       .select()
       .single();
 
-    if (error) return null;
+    if (error) {
+         console.error('Error updating transaction:', JSON.stringify(error, null, 2));
+         return null;
+    }
+    return mapTransactionFromDb(data);
+  },
 
-    return {
-        id: String(data.id),
-        name: data.name,
-        targetAmount: Number(data.target_amount),
-        currentAmount: Number(data.current_amount),
-        deadline: data.deadline
-    };
+  async deleteTransaction(id: string): Promise<boolean> {
+    const { error } = await supabase
+      .from('transactions')
+      .delete()
+      .eq('id', id);
+    
+    if (error) {
+        console.error('Error deleting transaction:', JSON.stringify(error, null, 2));
+        return false;
+    }
+    return true;
+  },
+
+  async getBudgets(): Promise<Budget[]> {
+     const { data, error } = await supabase.from('budgets').select('*');
+     if (error) {
+         console.error('Error fetching budgets:', JSON.stringify(error, null, 2));
+         return [];
+     }
+     return data || [];
+  },
+
+  async getGoals(): Promise<Goal[]> {
+      const { data, error } = await supabase.from('goals').select('*');
+      if (error) {
+          console.error('Error fetching goals:', JSON.stringify(error, null, 2));
+          return [];
+      }
+      return data || [];
+  },
+
+  async addGoal(goal: Omit<Goal, 'id'>): Promise<Goal | null> {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+
+      const payload = { ...goal, user_id: user.id };
+
+      const { data, error } = await supabase.from('goals').insert(payload).select().single();
+      if (error) {
+          console.error('Error adding goal:', JSON.stringify(error, null, 2));
+          return null;
+      }
+      return data;
+  },
+
+  async updateGoal(id: string, updates: Partial<Goal>): Promise<Goal | null> {
+      const { data, error } = await supabase.from('goals').update(updates).eq('id', id).select().single();
+      if (error) {
+          console.error('Error updating goal:', JSON.stringify(error, null, 2));
+          return null;
+      }
+      return data;
   },
 
   async deleteGoal(id: string): Promise<boolean> {
-    if (!supabase) return false;
-    const { error } = await supabase.from('goals').delete().eq('id', id);
-    return !error;
+      const { error } = await supabase.from('goals').delete().eq('id', id);
+      if (error) {
+          console.error('Error deleting goal:', JSON.stringify(error, null, 2));
+          return false;
+      }
+      return !error;
   }
 };

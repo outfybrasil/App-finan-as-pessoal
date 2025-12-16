@@ -28,6 +28,9 @@ export const Reports: React.FC<ReportsProps> = ({ transactions }) => {
     let totalExpense = 0;
 
     transactions.forEach(t => {
+        // Ignorar ajustes manuais de saldo nos relatórios
+        if (t.category === 'Ajuste') return;
+
         const tDate = new Date(t.date);
         // Verificar se pertence ao ano selecionado (ajuste básico de fuso)
         const year = tDate.getUTCFullYear();

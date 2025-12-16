@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Transaction, TransactionType } from '../types';
 import { Button } from './Button';
-import { ArrowUpCircle, ArrowDownCircle, X, CalendarClock, Trash2, Hash, Layers, Info, Copy, CheckCircle2, Clock } from 'lucide-react';
+import { ArrowUpCircle, ArrowDownCircle, X, CalendarClock, Trash2, Hash, Layers, Info, Copy, CheckCircle2, Clock, CreditCard } from 'lucide-react';
 import { ConfirmationModal } from './ConfirmationModal';
 
 interface QuickAddProps {
@@ -13,6 +13,7 @@ interface QuickAddProps {
     type: TransactionType,
     installments: number,
     isRecurring: boolean,
+    account: string,
     currentInstallment?: number,
     isPaid?: boolean
   ) => void;
@@ -43,6 +44,7 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('');
+  const [account, setAccount] = useState('Carteira'); // Default
   const [type, setType] = useState<TransactionType>('expense');
   // Inicializa com data local correta
   const [date, setDate] = useState(getLocalDate());
@@ -67,6 +69,7 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
     if (initialData) {
       setAmount(initialData.amount.toString());
       setCategory(initialData.category);
+      setAccount(initialData.account || 'Carteira');
       setType(initialData.type);
       setDate(initialData.date);
       setIsRecurring(!!initialData.isRecurring);
@@ -131,6 +134,7 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
     const payload = {
       amount: parseFloat(amount),
       category,
+      account,
       description: finalDescription,
       date,
       type,
@@ -149,6 +153,7 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
         payload.type, 
         isInstallmentMode ? installments : 1, 
         payload.isRecurring,
+        payload.account,
         currentInstallment,
         isPaid
       );
@@ -173,9 +178,12 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
   const installmentValue = (parseFloat(amount || '0') / (installments || 1));
   const remainingInstallments = Math.max(0, installments - currentInstallment);
 
-  // Adicionado 'Mercado' explicitamente
-  const expenseCategories = ['Mercado', 'Alimentação', 'Transporte', 'Moradia', 'Lazer', 'Saúde', 'Educação', 'Compras', 'Outros'];
-  const incomeCategories = ['Salário', 'Freelance', 'Investimentos', 'Presente', 'Outros'];
+  // Categorias
+  const expenseCategories = ['Mercado', 'Alimentação', 'Transporte', 'Moradia', 'Lazer', 'Saúde', 'Educação', 'Compras', 'Ajuste', 'Outros'];
+  const incomeCategories = ['Salário', 'Freelance', 'Investimentos', 'Presente', 'Ajuste', 'Outros'];
+
+  // Lista de Contas
+  const accountOptions = ['Carteira', 'Nubank', 'Itaú', 'Bradesco', 'Inter', 'Caixa', 'Santander', 'BB', 'C6', 'XP', 'Outros'];
 
   return (
     <>
@@ -255,6 +263,7 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
                 />
               </div>
 
+              {/* Category and Date Row */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-slate-400 mb-1">Categoria</label>
@@ -282,6 +291,22 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
                     required
                   />
                 </div>
+              </div>
+
+              {/* Account Selector */}
+              <div>
+                 <label className="block text-xs font-medium text-slate-400 mb-1 flex items-center gap-1">
+                    <CreditCard size={12}/> Conta / Carteira
+                 </label>
+                 <select
+                    value={account}
+                    onChange={(e) => setAccount(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-slate-600 outline-none appearance-none"
+                 >
+                    {accountOptions.map(acc => (
+                      <option key={acc} value={acc}>{acc}</option>
+                    ))}
+                 </select>
               </div>
 
               {/* Status Toggle (Paid/Pending) */}

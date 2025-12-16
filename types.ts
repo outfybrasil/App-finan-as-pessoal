@@ -5,6 +5,7 @@ export interface Transaction {
   groupId?: string; // Identificador para agrupar parcelas/recorrências da mesma série
   amount: number;
   category: string;
+  account: string; // Nova propriedade para conta/banco
   date: string; // ISO string YYYY-MM-DD
   description: string;
   type: TransactionType;

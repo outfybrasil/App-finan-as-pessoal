@@ -11,9 +11,9 @@ export const FinancialAudit: React.FC<FinancialAuditProps> = ({ transactions }) 
   const [advice, setAdvice] = useState<AuditAdvice | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // 1. Calcular Totais
+  // 1. Calcular Totais (Excluindo Ajustes)
   const income = transactions
-    .filter(t => t.type === 'income')
+    .filter(t => t.type === 'income' && t.category !== 'Ajuste')
     .reduce((acc, t) => acc + t.amount, 0);
 
   // Mapeamento de Categorias para 50/30/20
@@ -21,7 +21,7 @@ export const FinancialAudit: React.FC<FinancialAuditProps> = ({ transactions }) 
   let wants = 0;
   let savings = 0;
 
-  transactions.filter(t => t.type === 'expense').forEach(t => {
+  transactions.filter(t => t.type === 'expense' && t.category !== 'Ajuste').forEach(t => {
     const cat = t.category.toLowerCase();
     
     // Regras de Classificação

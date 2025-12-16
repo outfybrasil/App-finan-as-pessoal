@@ -1,29 +1,38 @@
 import React, { useState } from 'react';
 import { Transaction, Budget } from '../types';
-import { Wallet, TrendingUp, TrendingDown, AlertTriangle, ChevronLeft, ChevronRight, Edit2, CheckCircle2, Clock, PiggyBank } from 'lucide-react';
+import { Wallet, TrendingUp, TrendingDown, AlertTriangle, ChevronLeft, ChevronRight, Edit2, CheckCircle2, Clock, PiggyBank, CreditCard, X, Save, CalendarRange, Landmark } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { Button } from './Button';
 
 interface DashboardProps {
-  transactions: Transaction[];
+  transactions: Transaction[]; // Transações do MÊS (para gráficos e listas)
+  allTransactions?: Transaction[]; // TODAS as transações (não usado para saldo visual neste modo)
   budgets: Budget[];
   currentMonth: Date;
   onMonthChange: (date: Date) => void;
   onEditTransaction: (t: Transaction) => void;
   onToggleStatus?: (t: Transaction) => void;
+  onAdjustBalance?: (account: string, newBalance: number) => void;
   privacyMode?: boolean;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ 
   transactions, 
+  allTransactions = [], 
   budgets, 
   currentMonth, 
   onMonthChange,
   onEditTransaction,
   onToggleStatus,
+  onAdjustBalance,
   privacyMode = false
 }) => {
   // Adicionado tipo 'pending' ao estado
   const [filterType, setFilterType] = useState<'all' | 'income' | 'expense' | 'pending'>('all');
+  
+  // State for balance adjustment modal
+  const [editingAccount, setEditingAccount] = useState<{name: string, balance: number} | null>(null);
+  const [newBalanceInput, setNewBalanceInput] = useState('');
 
   const prevMonth = () => {
     const newDate = new Date(currentMonth);
@@ -48,31 +57,45 @@ export const Dashboard: React.FC<DashboardProps> = ({
     return `${day}/${month}`;
   };
 
+  // Helper for compact number formatting to avoid TS errors with 'as any' inline
+  const formatCompact = (val: number) => {
+    return val.toLocaleString('pt-BR', { 
+      compactDisplay: 'short', 
+      notation: 'compact' 
+    } as any);
+  };
+
   const checkPaid = (t: Transaction) => t.isPaid !== false;
 
-  // --- CALCULATIONS ---
+  // --- MONTHLY CALCULATIONS ---
+  // A pedido: Todas as métricas agora são estritamente do mês selecionado.
+  // "Não deve puxar do mês anterior" -> Usamos apenas a prop `transactions`
+  // IMPORTANT: Filter out 'Ajuste' so legacy cumulative corrections don't skew the monthly flow.
+  
   const currentIncome = transactions
-    .filter(t => t.type === 'income' && checkPaid(t))
+    .filter(t => t.type === 'income' && checkPaid(t) && t.category !== 'Ajuste')
     .reduce((acc, t) => acc + t.amount, 0);
 
   const currentExpense = transactions
-    .filter(t => t.type === 'expense' && checkPaid(t))
+    .filter(t => t.type === 'expense' && checkPaid(t) && t.category !== 'Ajuste')
     .reduce((acc, t) => acc + t.amount, 0);
 
-  const currentBalance = currentIncome - currentExpense;
+  // Month Balance (Fluxo do Mês - Realizado)
+  const monthlyBalance = currentIncome - currentExpense;
 
   const pendingIncome = transactions
-    .filter(t => t.type === 'income' && !checkPaid(t))
+    .filter(t => t.type === 'income' && !checkPaid(t) && t.category !== 'Ajuste')
     .reduce((acc, t) => acc + t.amount, 0);
 
   const pendingExpense = transactions
-    .filter(t => t.type === 'expense' && !checkPaid(t))
+    .filter(t => t.type === 'expense' && !checkPaid(t) && t.category !== 'Ajuste')
     .reduce((acc, t) => acc + t.amount, 0);
 
-  const projectedBalance = (currentIncome + pendingIncome) - (currentExpense + pendingExpense);
+  // Projected Balance (Previsto = Realizado + Pendente)
+  const projectedBalance = monthlyBalance + (pendingIncome - pendingExpense);
 
   const expensesByCategory = transactions
-    .filter(t => t.type === 'expense')
+    .filter(t => t.type === 'expense' && t.category !== 'Ajuste')
     .reduce((acc, t) => {
       acc[t.category] = (acc[t.category] || 0) + t.amount;
       return acc;
@@ -83,10 +106,30 @@ export const Dashboard: React.FC<DashboardProps> = ({
     value: expensesByCategory[key]
   }));
 
+  // --- ACCOUNT BALANCES (MONTHLY ISOLATED) ---
+  // Calculamos o saldo de cada conta APENAS com as transações deste mês.
+  // Ignoramos 'Ajuste' para que o saldo represente apenas o fluxo real.
+  const accountsList = transactions.filter(t => t.category !== 'Ajuste'); 
+  const accounts = Array.from(new Set(accountsList.map(t => t.account || 'Carteira')));
+  
+  const accountBalances = accounts.map(acc => {
+      const accTransactions = accountsList.filter(t => (t.account || 'Carteira') === acc && checkPaid(t));
+      const income = accTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + Number(t.amount), 0);
+      const expense = accTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + Number(t.amount), 0);
+      return { name: acc, balance: income - expense };
+  }).sort((a, b) => b.balance - a.balance);
+
+  // Total do mês em todas as contas (Fluxo Líquido) - Deve bater com monthlyBalance
+  const totalMonthlyFlow = monthlyBalance;
+
+
   const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
   // Lógica de filtro atualizada
   const displayedTransactions = transactions.filter(t => {
+      // Ocultar ajustes da lista de transações
+      if (t.category === 'Ajuste') return false; 
+      
       if (filterType === 'all') return true;
       if (filterType === 'pending') return !checkPaid(t);
       return t.type === filterType;
@@ -105,7 +148,26 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const privacyClass = privacyMode ? "blur-md select-none opacity-50" : "";
   const privacyClassText = privacyMode ? "text-transparent bg-white/20 rounded blur-sm select-none" : "";
 
+  // Handlers for Account Adjustment
+  // NOTA: Ajuste manual removido das contas para evitar confusão com 'Ajuste' oculto.
+  const handleAccountClick = (name: string, balance: number) => {
+     // setEditingAccount({ name, balance });
+     // setNewBalanceInput(balance.toFixed(2));
+  };
+
+  const handleSaveBalance = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (editingAccount && onAdjustBalance) {
+          const newBalance = parseFloat(newBalanceInput);
+          if (!isNaN(newBalance)) {
+              onAdjustBalance(editingAccount.name, newBalance);
+          }
+      }
+      setEditingAccount(null);
+  };
+
   return (
+    <>
     <div className="space-y-8 pb-24 md:pb-0">
       
       {/* Header & Month Selector */}
@@ -131,10 +193,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
       {/* Hero Section - Cards */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
         
-        {/* Main Balance Card */}
+        {/* Main Balance Card - MENSAL ISOLADO */}
         <div className="md:col-span-6 relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-800 shadow-2xl shadow-emerald-900/20 group">
           <div className="absolute top-0 right-0 p-8 opacity-10 transform group-hover:scale-110 transition-transform duration-700">
-            <Wallet size={120} className="text-white" />
+            <CalendarRange size={120} className="text-white" />
           </div>
           
           <div className="relative p-8 h-full flex flex-col justify-between z-10">
@@ -143,24 +205,33 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <div className="p-1.5 bg-white/10 rounded-lg backdrop-blur-md">
                    <Wallet size={18} />
                 </div>
-                <span className="font-medium">Saldo em Conta</span>
+                <span className="font-medium">Fluxo Líquido do Mês</span>
               </div>
               <h2 className={`text-4xl md:text-5xl font-bold text-white tracking-tight mt-2 ${privacyClass}`}>
-                R$ {currentBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                R$ {totalMonthlyFlow.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </h2>
             </div>
             
             <div className="mt-8 pt-6 border-t border-white/10 flex items-center justify-between">
                <div>
-                  <p className="text-emerald-100 text-xs font-medium uppercase tracking-wider mb-1">Previsão de Fechamento</p>
-                  <p className={`text-xl font-bold text-white ${privacyClass}`}>
-                    R$ {projectedBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  <p className="text-emerald-100 text-xs font-medium uppercase tracking-wider mb-1">
+                      Previsão (Considerando Pendentes)
                   </p>
+                  <div className={`flex items-center gap-2 ${privacyClass}`}>
+                    <span className={`text-lg font-bold ${projectedBalance >= 0 ? 'text-white' : 'text-rose-200'}`}>
+                        {projectedBalance >= 0 ? '+' : ''} R$ {projectedBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
                </div>
                <div className="text-right">
-                  {currentBalance > 0 && (
+                  {totalMonthlyFlow > 0 && (
                      <span className="inline-flex items-center gap-1 px-3 py-1 bg-white/20 rounded-full text-xs font-medium text-white backdrop-blur-md border border-white/10">
-                        <TrendingUp size={14} /> Positivo
+                        <CheckCircle2 size={14} /> Superávit
+                     </span>
+                  )}
+                  {totalMonthlyFlow < 0 && (
+                     <span className="inline-flex items-center gap-1 px-3 py-1 bg-rose-500/20 rounded-full text-xs font-medium text-white backdrop-blur-md border border-white/10">
+                        <TrendingDown size={14} /> Déficit
                      </span>
                   )}
                </div>
@@ -171,7 +242,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         {/* Secondary Cards Column */}
         <div className="md:col-span-6 grid grid-cols-1 sm:grid-cols-2 gap-6">
             
-            {/* Income Card */}
+            {/* Income Card (Month) */}
             <div className="bg-slate-900/50 p-6 rounded-3xl border border-slate-800 flex flex-col justify-between hover:border-emerald-500/30 transition-colors group">
               <div className="flex justify-between items-start">
                 <div className="p-3 bg-emerald-500/10 rounded-2xl text-emerald-500 group-hover:bg-emerald-500 group-hover:text-white transition-all">
@@ -179,19 +250,19 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 </div>
                 {pendingIncome > 0 && (
                    <span className="text-[10px] bg-slate-800 px-2 py-1 rounded-full text-slate-400 border border-slate-700">
-                     + R$ {pendingIncome.toLocaleString('pt-BR', { compactDisplay: 'short', notation: 'compact' })} pendente
+                     + R$ {formatCompact(pendingIncome)} pendente
                    </span>
                 )}
               </div>
               <div>
-                <p className="text-slate-400 text-sm font-medium mt-4">Entradas</p>
+                <p className="text-slate-400 text-sm font-medium mt-4">Entradas (Mês)</p>
                 <h3 className={`text-2xl font-bold text-emerald-400 mt-1 ${privacyClassText}`}>
                   R$ {currentIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </h3>
               </div>
             </div>
 
-            {/* Expense Card */}
+            {/* Expense Card (Month) */}
             <div className="bg-slate-900/50 p-6 rounded-3xl border border-slate-800 flex flex-col justify-between hover:border-rose-500/30 transition-colors group">
               <div className="flex justify-between items-start">
                 <div className="p-3 bg-rose-500/10 rounded-2xl text-rose-500 group-hover:bg-rose-500 group-hover:text-white transition-all">
@@ -199,12 +270,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 </div>
                 {pendingExpense > 0 && (
                    <span className="text-[10px] bg-slate-800 px-2 py-1 rounded-full text-slate-400 border border-slate-700">
-                     + R$ {pendingExpense.toLocaleString('pt-BR', { compactDisplay: 'short', notation: 'compact' })} pendente
+                     + R$ {formatCompact(pendingExpense)} pendente
                    </span>
                 )}
               </div>
               <div>
-                <p className="text-slate-400 text-sm font-medium mt-4">Saídas</p>
+                <p className="text-slate-400 text-sm font-medium mt-4">Saídas (Mês)</p>
                 <h3 className={`text-2xl font-bold text-rose-400 mt-1 ${privacyClassText}`}>
                   R$ {currentExpense.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </h3>
@@ -222,11 +293,44 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       <p className="text-xs text-slate-500">Receitas - Despesas</p>
                   </div>
                </div>
-               <span className={`font-bold text-lg ${currentBalance >= 0 ? 'text-white' : 'text-rose-400'} ${privacyClassText}`}>
-                   {((currentIncome - currentExpense) / (currentIncome || 1) * 100).toFixed(0)}%
+               <span className={`font-bold text-lg ${monthlyBalance >= 0 ? 'text-white' : 'text-rose-400'} ${privacyClassText}`}>
+                   {currentIncome > 0 ? ((monthlyBalance / currentIncome) * 100).toFixed(0) : '0'}%
                </span>
             </div>
         </div>
+      </div>
+
+      {/* Account Balances Section (Horizontal Scroll) - MENSAL ISOLADO */}
+      <div className="w-full overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 md:px-0">
+         <div className="flex gap-4 min-w-max">
+            {accountBalances.map(acc => (
+                <div 
+                    key={acc.name} 
+                    className="bg-slate-800/50 p-4 rounded-2xl border border-slate-700 min-w-[200px] flex flex-col justify-between transition-all group cursor-default"
+                >
+                    <div className="flex items-center justify-between text-slate-400 mb-3">
+                        <div className="flex items-center gap-2">
+                             <CreditCard size={16} />
+                             <span className="text-sm font-medium">{acc.name}</span>
+                        </div>
+                    </div>
+                    <div className="flex flex-col">
+                        <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">Movimentação</span>
+                        <p className={`text-lg font-bold ${acc.balance >= 0 ? 'text-white' : 'text-rose-400'} ${privacyClassText}`}>
+                            R$ {acc.balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </p>
+                    </div>
+                </div>
+            ))}
+            {accountBalances.length === 0 && (
+                <div className="text-slate-500 text-sm italic p-4">
+                    Registre transações neste mês para ver o fluxo das contas.
+                </div>
+            )}
+         </div>
+         <p className="text-[10px] text-slate-500 mt-2 px-1 hidden md:block">
+            * Valores refletem apenas entradas e saídas deste mês.
+         </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -291,8 +395,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
                             <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700 uppercase tracking-wide">Fixo</span>
                         )}
                     </div>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                        {formatDateDisplay(t.date)} • {t.category}
+                    <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-2">
+                        <span>{formatDateDisplay(t.date)}</span>
+                        <span>•</span>
+                        <span className="text-slate-400 font-medium bg-slate-800/50 px-1.5 py-0.5 rounded">{t.account || 'Carteira'}</span>
+                        <span>•</span>
+                        <span>{t.category}</span>
                     </p>
                   </div>
                 </div>
@@ -368,7 +476,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                             <Tooltip 
                             contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#f1f5f9', borderRadius: '12px', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.3)' }}
                             itemStyle={{ color: '#f1f5f9', fontSize: '12px' }}
-                            formatter={(value: number) => `R$ ${value.toLocaleString()}`}
+                            formatter={(value: number) => `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
                             />
                         </PieChart>
                         </ResponsiveContainer>
@@ -377,7 +485,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none flex-col">
                             <span className="text-slate-500 text-xs uppercase font-bold tracking-wider mb-1">Total Saídas</span>
                             <p className={`text-white font-bold text-xl ${privacyClassText}`}>
-                                R$ {(currentExpense + pendingExpense).toLocaleString('pt-BR', { notation: 'compact' })}
+                                R$ {formatCompact(currentExpense + pendingExpense)}
                             </p>
                         </div>
                     </div>
@@ -411,5 +519,53 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
     </div>
+    
+    {/* Adjust Balance Modal */}
+    {editingAccount && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+                <div className="flex justify-between items-center p-4 border-b border-slate-800">
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                        <CreditCard size={18} className="text-emerald-500" />
+                        Ajustar Saldo ({editingAccount.name})
+                    </h3>
+                    <button onClick={() => setEditingAccount(null)} className="text-slate-400 hover:text-white">
+                        <X size={20} />
+                    </button>
+                </div>
+                
+                <form onSubmit={handleSaveBalance} className="p-6 space-y-4">
+                    <p className="text-sm text-slate-400">
+                        Informe o saldo desejado para este mês. O sistema criará um lançamento de "Ajuste" para atingir este valor.
+                    </p>
+                    
+                    <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">Novo Saldo</label>
+                        <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">R$</span>
+                            <input 
+                                type="number" 
+                                step="0.01"
+                                value={newBalanceInput}
+                                onChange={(e) => setNewBalanceInput(e.target.value)}
+                                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 pl-9 py-3 text-xl text-white focus:ring-2 focus:ring-emerald-500 outline-none font-bold"
+                                autoFocus
+                            />
+                        </div>
+                    </div>
+
+                    <div className="flex gap-3 pt-2">
+                        <Button type="button" variant="secondary" onClick={() => setEditingAccount(null)} fullWidth>
+                            Cancelar
+                        </Button>
+                        <Button type="submit" fullWidth className="flex items-center gap-2">
+                            <Save size={18} /> Salvar
+                        </Button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    )}
+    </>
   );
 };

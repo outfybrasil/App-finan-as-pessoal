@@ -91,6 +91,7 @@ const App: React.FC = () => {
       type: TransactionType,
       installments: number = 1,
       isRecurring: boolean = false,
+      account: string = 'Carteira',
       currentInstallment: number = 1,
       isPaid: boolean = true
   ) => {
@@ -112,6 +113,7 @@ const App: React.FC = () => {
                 groupId,
                 amount: parseFloat(installmentValue.toFixed(2)),
                 category,
+                account,
                 description: `${description} (${i}/${installments})`,
                 date: currentDate.toISOString().split('T')[0],
                 type,
@@ -134,6 +136,7 @@ const App: React.FC = () => {
                 groupId,
                 amount: amount,
                 category,
+                account,
                 description: description,
                 date: currentDate.toISOString().split('T')[0],
                 type,
@@ -146,6 +149,7 @@ const App: React.FC = () => {
         newTransactions.push({
             amount,
             category,
+            account,
             description,
             date,
             type,
@@ -165,6 +169,64 @@ const App: React.FC = () => {
       const localAdded = newTransactions.map((t, i) => ({ ...t, id: generateId() + i } as Transaction));
       setAllTransactions(prev => [...localAdded, ...prev]);
     }
+  };
+
+  // Função para ajustar saldo criando uma transação de diferença
+  const handleAdjustBalance = async (accountName: string, newBalance: number) => {
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    // 1. Identificar e Remover ajustes anteriores DO MESMO DIA para evitar duplicação/acumulo
+    // Isso permite que o usuário corrija o saldo várias vezes no mesmo dia sem criar uma pilha de ajustes
+    const adjustmentsToDelete = allTransactions.filter(t => 
+        t.category === 'Ajuste' && 
+        (t.account || 'Carteira') === accountName && 
+        t.date === todayStr
+    );
+
+    let cleanTransactions = [...allTransactions];
+    
+    if (adjustmentsToDelete.length > 0) {
+        // Remover localmente para cálculo
+        cleanTransactions = allTransactions.filter(t => !adjustmentsToDelete.some(adj => adj.id === t.id));
+        
+        // Remover do banco
+        for (const adj of adjustmentsToDelete) {
+           if (supabase) await financeService.deleteTransaction(adj.id);
+        }
+        
+        // Atualizar estado local antes de calcular
+        setAllTransactions(cleanTransactions);
+    }
+
+    // 2. Calcular saldo atual "limpo" (sem os ajustes de hoje)
+    const accountTransactions = cleanTransactions.filter(t => 
+        (t.account || 'Carteira') === accountName && t.isPaid !== false
+    );
+    
+    const currentBalance = accountTransactions.reduce((acc, t) => {
+        const val = Number(t.amount); 
+        return t.type === 'income' ? acc + val : acc - val;
+    }, 0);
+
+    const difference = newBalance - currentBalance;
+
+    if (Math.abs(difference) < 0.01) return; 
+
+    const type: TransactionType = difference > 0 ? 'income' : 'expense';
+    const amount = Math.abs(difference);
+
+    await handleAddTransaction(
+        amount,
+        'Ajuste', 
+        'Correção de Saldo (Sistema)',
+        todayStr,
+        type,
+        1,
+        false,
+        accountName,
+        1,
+        true 
+    );
   };
 
   const handleEditTransaction = async (id: string, updates: any, updateSeries: boolean = false) => {
@@ -205,7 +267,9 @@ const App: React.FC = () => {
                  ...updates,
                  description: newDescription,
                  date: sibling.id === id ? updates.date : sibling.date,
-                 isPaid: sibling.id === id ? updates.isPaid : sibling.isPaid
+                 isPaid: sibling.id === id ? updates.isPaid : sibling.isPaid,
+                 // Propagate account change if editing series
+                 account: updates.account
              };
 
              transactionsToUpdate.push({ id: sibling.id, data: siblingUpdates });
@@ -309,6 +373,7 @@ const App: React.FC = () => {
       const preFill: any = {
           amount: total,
           category: 'Mercado',
+          account: 'Carteira',
           description: 'Compras de Mercado (Lista)',
           type: 'expense',
           date: new Date().toISOString().split('T')[0],
@@ -444,12 +509,14 @@ const App: React.FC = () => {
           
           {currentView === View.DASHBOARD && (
             <Dashboard 
-                transactions={filteredTransactions} 
+                transactions={filteredTransactions} // Transações do Mês (para listas e gráficos)
+                allTransactions={allTransactions}   // Transações Totais (para cálculo de saldo real)
                 budgets={budgets} 
                 currentMonth={currentMonth}
                 onMonthChange={setCurrentMonth}
                 onEditTransaction={openEditModal}
                 onToggleStatus={handleToggleStatus}
+                onAdjustBalance={handleAdjustBalance}
                 privacyMode={privacyMode}
             />
           )}

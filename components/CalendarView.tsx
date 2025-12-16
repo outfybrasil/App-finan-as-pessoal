@@ -54,7 +54,10 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   const daysArray = Array.from({ length: days }, (_, i) => i + 1);
 
   // Group transactions by date
-  const transactionsByDate = transactions.reduce((acc, t) => {
+  // FILTERING 'Ajuste' transactions to hide them from the calendar
+  const filteredTransactions = transactions.filter(t => t.category !== 'Ajuste');
+
+  const transactionsByDate = filteredTransactions.reduce((acc, t) => {
     const dateKey = t.date; // YYYY-MM-DD
     if (!acc[dateKey]) acc[dateKey] = [];
     acc[dateKey].push(t);
