@@ -263,52 +263,28 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
 
           <form onSubmit={handleSubmit} className="p-5 md:p-8 space-y-6 md:space-y-8 overflow-y-auto custom-scrollbar">
             {/* Type Selector */}
-            <div className="flex gap-4 p-1.5 glass rounded-sm">
+            <div className="flex gap-4 p-1.5 glass rounded-2xl">
               <button
                 type="button"
-                onClick={() => {
-                  setType('expense');
-                  setCategory('Mercado');
-                  setIsPaid(true);
-                }}
-                className={`flex-1 flex items-center justify-center gap-3 py-4 rounded-sm border transition-all duration-500 ${type === 'expense'
+                onClick={() => setType('expense')}
+                className={`flex-1 flex items-center justify-center gap-3 py-4 rounded-xl border transition-all duration-500 ${type === 'expense'
                   ? 'bg-rose-500 text-white border-rose-500 shadow-xl shadow-rose-500/20'
                   : 'bg-transparent border-transparent text-slate-500 hover:text-slate-300'
                   }`}
               >
-                <TrendingDown size={20} className={type === 'expense' ? 'animate-bounce' : ''} />
-                <span className="font-black text-xs uppercase tracking-[0.15em]">Despesa</span>
+                <ArrowDownCircle size={20} className={type === 'expense' ? 'animate-bounce' : ''} />
+                <span className="font-black text-xs uppercase tracking-widest">Despesa</span>
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setType('income');
-                  setCategory('Salário');
-                  setIsPaid(true);
-                }}
-                className={`flex-1 flex items-center justify-center gap-3 py-4 rounded-sm border transition-all duration-500 ${type === 'income'
-                  ? 'bg-emerald-500 text-black border-emerald-500 shadow-xl shadow-emerald-500/20'
+                onClick={() => setType('income')}
+                className={`flex-1 flex items-center justify-center gap-3 py-4 rounded-xl border transition-all duration-500 ${type === 'income'
+                  ? 'bg-emerald-500 text-white border-emerald-500 shadow-xl shadow-emerald-500/20'
                   : 'bg-transparent border-transparent text-slate-500 hover:text-slate-300'
                   }`}
               >
-                <TrendingUp size={20} className={type === 'income' ? 'animate-bounce' : ''} />
-                <span className="font-black text-xs uppercase tracking-[0.15em]">Receita</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setType('transfer');
-                  setCategory('Transferência');
-                  setIsSplitMode(false);
-                  setIsPaid(true);
-                }}
-                className={`flex-1 flex items-center justify-center gap-3 py-4 rounded-sm border transition-all duration-500 ${type === 'transfer'
-                  ? 'bg-blue-500 text-white border-blue-500 shadow-xl shadow-blue-500/20'
-                  : 'bg-transparent border-transparent text-slate-500 hover:text-slate-300'
-                  }`}
-              >
-                <Layers size={20} className={type === 'transfer' ? 'animate-pulse' : ''} />
-                <span className="font-black text-xs uppercase tracking-[0.15em]">Transferência</span>
+                <ArrowUpCircle size={20} className={type === 'income' ? 'animate-bounce' : ''} />
+                <span className="font-black text-xs uppercase tracking-widest">Receita</span>
               </button>
             </div>
 
@@ -637,10 +613,9 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
                   <Trash2 size={24} />
                 </button>
               )}
-               <button
+              <button
                 type="submit"
-                disabled={!isSplitsValid || (type === 'transfer' && account === destinationAccount)}
-                className={`flex-1 bg-gradient-to-tr from-emerald-500 to-emerald-400 text-white rounded-sm py-5 px-8 font-black text-sm uppercase tracking-[0.2em] shadow-xl shadow-emerald-500/20 hover:shadow-emerald-500/40 hover:-translate-y-0.5 active:scale-95 transition-all outline-none ${(!isSplitsValid || (type === 'transfer' && account === destinationAccount)) ? 'opacity-50 grayscale cursor-not-allowed' : ''}`}
+                className="flex-1 bg-gradient-to-tr from-emerald-500 to-emerald-400 text-white rounded-[1.5rem] py-5 px-8 font-black text-sm uppercase tracking-[0.2em] shadow-xl shadow-emerald-500/20 hover:shadow-emerald-500/40 hover:-translate-y-1 active:scale-95 transition-all outline-none"
               >
                 {isEditing ? 'Salvar Alterações' : 'Confirmar Lançamento'}
               </button>

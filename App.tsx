@@ -558,7 +558,7 @@ const App: React.FC = () => {
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 md:ml-72 p-4 pt-4 pb-36 md:p-12 md:pb-12 overflow-y-auto min-h-screen relative bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.08),_transparent_28%),linear-gradient(180deg,_#020617_0%,_#020617_48%,_#04111f_100%)]">
+        <main className="flex-1 md:ml-72 p-6 pt-4 pb-36 md:p-12 md:pb-12 overflow-y-auto min-h-screen relative bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.08),_transparent_28%),linear-gradient(180deg,_#020617_0%,_#020617_48%,_#04111f_100%)]">
           {/* Decorative Elements */}
           <div className="fixed top-[-10%] left-[-10%] w-[40%] h-[40%] bg-emerald-500/5 rounded-full blur-[120px] pointer-events-none" />
           <div className="fixed bottom-[-10%] right-[-10%] w-[30%] h-[30%] bg-blue-500/5 rounded-full blur-[100px] pointer-events-none" />

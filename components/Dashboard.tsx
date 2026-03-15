@@ -291,14 +291,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
             )}
           </div>
 
-          <div className="flex w-full md:w-auto items-center justify-between glass rounded-[1.75rem] p-1 shadow-xl">
-            <button onClick={prevMonth} className="w-11 h-11 flex items-center justify-center bg-white/5 hover:bg-white/10 rounded-xl text-slate-400 hover:text-white transition-all border border-white/5 shrink-0">
+          <div className="flex w-full md:w-auto items-center justify-between glass rounded-[1.75rem] p-1.5 shadow-xl">
+            <button onClick={prevMonth} className="p-3 hover:bg-white/10 rounded-xl text-slate-400 hover:text-white transition-all">
               <ChevronLeft size={20} />
             </button>
-            <div className="flex-1 flex items-center justify-center px-4 font-bold text-slate-100 text-base md:text-lg text-center capitalize tracking-tight">
+            <div className="px-4 md:px-6 flex items-center gap-2 font-bold text-slate-100 min-w-0 flex-1 justify-center text-base md:text-lg text-center">
               {formatMonth(currentMonth)}
             </div>
-            <button onClick={nextMonth} className="w-11 h-11 flex items-center justify-center bg-white/5 hover:bg-white/10 rounded-xl text-slate-400 hover:text-white transition-all border border-white/5 shrink-0">
+            <button onClick={nextMonth} className="p-3 hover:bg-white/10 rounded-xl text-slate-400 hover:text-white transition-all">
               <ChevronRight size={20} />
             </button>
           </div>
@@ -465,7 +465,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <div
                 key={acc.name}
                 onClick={() => handleAccountClick(acc.name as string, acc.balance)}
-                className="bg-slate-900 border border-white/5 p-5 rounded-sm min-w-[200px] md:min-w-[220px] flex flex-col justify-between transition-all group cursor-pointer hover:border-blue-500/40 hover:bg-slate-800/40 snap-start relative overflow-hidden"
+                className="bg-slate-800/50 p-4 rounded-[1.5rem] border border-slate-700 min-w-[180px] md:min-w-[200px] flex flex-col justify-between transition-all group cursor-pointer hover:border-emerald-500/50 hover:bg-slate-800 snap-start"
               >
                 {/* Micro-accent */}
                 <div className="absolute top-0 right-0 w-8 h-8 bg-blue-500/5 rotate-45 translate-x-4 -translate-y-4 group-hover:bg-blue-500/20 transition-all" />
@@ -477,7 +477,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     </div>
                     <span className="text-[11px] font-black uppercase tracking-[0.15em]">{acc.name}</span>
                   </div>
-                  <ChevronRight size={14} className="opacity-40 group-hover:opacity-100 transition-opacity" />
+                  <Edit2 size={14} className="opacity-70 md:opacity-0 md:group-hover:opacity-100 transition-opacity" />
                 </div>
                 <div className="flex flex-col">
                   <span className="text-[9px] text-slate-600 uppercase font-black tracking-[0.2em] mb-1.5">Saldo Disponível</span>

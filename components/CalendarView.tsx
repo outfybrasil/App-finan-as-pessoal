@@ -87,33 +87,33 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           <p className="text-slate-500 font-bold mt-2 ml-16">Histórico visual das suas movimentações</p>
         </div>
         
-        <div className="flex w-full md:w-auto items-center justify-between glass p-1 rounded-2xl border-white/5 shadow-xl">
-          <button onClick={prevMonth} className="w-12 h-12 flex items-center justify-center bg-white/5 hover:bg-white/10 rounded-xl text-slate-400 hover:text-white transition-all active:scale-90 border border-white/5 shrink-0">
-            <ChevronLeft size={20} />
+        <div className="flex items-center glass p-1.5 rounded-2xl border-white/5 shadow-xl">
+          <button onClick={prevMonth} className="p-3 hover:bg-white/5 rounded-xl text-slate-400 hover:text-white transition-all active:scale-90">
+            <ChevronLeft size={24} />
           </button>
-          <div className="flex-1 flex items-center justify-center px-4 font-black text-lg sm:text-xl text-white capitalize tracking-tight">
+          <div className="px-8 flex items-center gap-3 font-black text-xl text-white min-w-[180px] justify-center capitalize tracking-tighter">
             {formatMonth(currentMonth)}
           </div>
-          <button onClick={nextMonth} className="w-12 h-12 flex items-center justify-center bg-white/5 hover:bg-white/10 rounded-xl text-slate-400 hover:text-white transition-all active:scale-90 border border-white/5 shrink-0">
-            <ChevronRight size={20} />
+          <button onClick={nextMonth} className="p-3 hover:bg-white/5 rounded-xl text-slate-400 hover:text-white transition-all active:scale-90">
+            <ChevronRight size={24} />
           </button>
         </div>
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 flex-1 min-h-0">
         {/* Calendar Grid */}
-        <div className="lg:col-span-2 glass-card rounded-[2.5rem] border-white/10 p-4 sm:p-8 flex flex-col shadow-2xl overflow-hidden min-h-[500px]">
+        <div className="lg:col-span-2 glass-card rounded-[2.5rem] border-white/10 p-6 sm:p-8 flex flex-col shadow-2xl overflow-hidden min-h-[500px]">
            {/* Weekday Headers */}
            <div className="grid grid-cols-7 mb-8">
-               {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((day, i) => (
-                 <div key={i} className={`text-center text-[9px] sm:text-[10px] font-black uppercase tracking-[0.1em] sm:tracking-[0.2em] ${i === 0 || i === 6 ? 'text-slate-600' : 'text-slate-500'}`}>
+              {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((day, i) => (
+                 <div key={i} className={`text-center text-[10px] font-black uppercase tracking-[0.2em] ${i === 0 || i === 6 ? 'text-slate-600' : 'text-slate-500'}`}>
                     {day}
                  </div>
               ))}
            </div>
            
            {/* Days Grid */}
-           <div className="grid grid-cols-7 gap-1 sm:gap-3 flex-1 auto-rows-fr">
+           <div className="grid grid-cols-7 gap-2 sm:gap-3 flex-1 auto-rows-fr">
               {blanks.map((_, i) => (
                  <div key={`blank-${i}`} className="bg-transparent" />
               ))}
@@ -136,7 +136,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                        key={day}
                        onClick={() => setSelectedDate(dateKey)}
                        className={`
-                         relative rounded-lg sm:rounded-2xl p-1.5 sm:p-3 flex flex-col items-center justify-start h-full transition-all border group
+                         relative rounded-2xl p-2 sm:p-3 flex flex-col items-center justify-start h-full transition-all border group
                          ${isSelected 
                             ? 'bg-emerald-500/10 border-emerald-500 shadow-lg shadow-emerald-500/10 scale-[1.05] z-10' 
                             : 'bg-white/[0.02] border-white/[0.05] hover:bg-white/[0.05] hover:border-white/20'
@@ -145,16 +145,16 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                        `}
                     >
                        <div className="flex items-start justify-between w-full">
-                           <span className={`text-[11px] sm:text-sm font-black tracking-tight ${isToday ? 'text-emerald-400' : (isSelected ? 'text-white' : 'text-slate-400')}`}>
+                           <span className={`text-sm font-black tracking-tight ${isToday ? 'text-emerald-400' : (isSelected ? 'text-white' : 'text-slate-400')}`}>
                               {day}
                            </span>
-                           {hasPending && <div className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-amber-500 animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.5)]" />}
+                           {hasPending && <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.5)]" />}
                        </div>
                        
                        {/* Indicator Dots */}
-                       <div className="mt-auto flex gap-0.5 sm:gap-1 justify-center">
-                          {hasIncome && <div className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />}
-                          {hasExpense && <div className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]" />}
+                       <div className="mt-auto flex gap-1 justify-center">
+                          {hasIncome && <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />}
+                          {hasExpense && <div className="w-1.5 h-1.5 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]" />}
                        </div>
                     </button>
                  );
