@@ -93,26 +93,28 @@ export const financeService = {
 
   async updateTransaction(id: string, updates: Partial<Transaction>): Promise<Transaction | null> {
     try {
-      const payload: any = { ...updates };
-      if (updates.groupId !== undefined) payload.group_id = updates.groupId;
+      // Whitelist: montar payload apenas com campos válidos do Appwrite
+      const payload: Record<string, any> = {};
+
+      if (updates.amount !== undefined) payload.amount = updates.amount;
+      if (updates.category !== undefined) payload.category = updates.category;
+      if (updates.account !== undefined) payload.account = updates.account;
+      if (updates.description !== undefined) payload.description = updates.description;
+      if (updates.date !== undefined) payload.date = updates.date;
+      if (updates.type !== undefined) payload.type = updates.type;
       if (updates.isRecurring !== undefined) payload.is_recurring = updates.isRecurring;
       if (updates.isPaid !== undefined) payload.is_paid = updates.isPaid;
       if (updates.paymentMethod !== undefined) payload.payment_method = updates.paymentMethod;
       if (updates.attachmentId !== undefined) payload.attachment_id = updates.attachmentId;
+      if (updates.groupId !== undefined) payload.group_id = updates.groupId;
       if (updates.tags !== undefined) payload.tags = updates.tags;
       if (updates.splits !== undefined) payload.splits = updates.splits ? JSON.stringify(updates.splits) : null;
       if (updates.destinationAccount !== undefined) payload.destination_account = updates.destinationAccount;
 
-      // Remove campos undefined/null e id que não deve ser enviado
-      delete payload.id;
-      delete payload.groupId;
-      delete payload.isRecurring;
-      delete payload.isPaid;
-      delete payload.paymentMethod;
-      delete payload.attachmentId;
-      // Note: We used to delete payload.splits here, but that prevented updates from persisting splits.
-
-
+      if (Object.keys(payload).length === 0) {
+        console.warn('updateTransaction: nenhum campo válido para atualizar');
+        return null;
+      }
 
       const doc = await databases.updateDocument(
         APPWRITE_DATABASE_ID,
@@ -122,7 +124,7 @@ export const financeService = {
       );
       return mapDocumentToTransaction(doc);
     } catch (error) {
-      console.error('Error updating transaction:', error);
+      console.error('Erro ao atualizar transação:', error);
       return null;
     }
   },

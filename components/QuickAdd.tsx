@@ -130,7 +130,7 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
     }
   }, [date, initialData]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!amount || !category) return;
 
@@ -166,7 +166,12 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
     };
 
     if (isEditing && onEdit) {
-      onEdit(initialData!.id, payload, updateSeries);
+      const success = await onEdit(initialData!.id, payload, updateSeries);
+      if (success === false) {
+        setAlertMessage("Erro ao salvar as alterações. Verifique sua conexão ou campos obrigatórios.");
+        setShowAlertDialog(true);
+        return; // Não fecha o modal se falhar
+      }
     } else {
       onAdd(
         payload.amount,

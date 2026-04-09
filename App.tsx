@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { View, Transaction, Budget, Goal, TransactionType } from './types';
-import { LayoutDashboard, Plus, PieChart, BarChart3, ShoppingCart, Calendar as CalendarIcon, Eye, EyeOff, LogOut, CreditCard, Download, Wallet } from 'lucide-react';
+import { LayoutDashboard, Plus, PieChart, BarChart3, ShoppingCart, Calendar as CalendarIcon, Eye, EyeOff, LogOut, CreditCard, Download, Wallet, CalendarRange } from 'lucide-react';
 import { Dashboard } from './components/Dashboard';
 import { QuickAdd } from './components/QuickAdd';
 import { BudgetGoals } from './components/BudgetGoals';
 import { Reports } from './components/Reports';
 import { ShoppingList } from './components/ShoppingList';
 import { CalendarView } from './components/CalendarView';
+import { CashFlowSimulation } from './components/CashFlowSimulation';
 import { Auth } from './components/Auth';
 import { useAuth } from './hooks/useAuth';
 import { useFinance } from './hooks/useFinance';
@@ -259,14 +260,14 @@ const App: React.FC = () => {
     );
   };
 
-  const handleEditTransaction = async (id: string, updates: any, updateSeries: boolean = false) => {
+  const handleEditTransaction = async (id: string, updates: any, updateSeries: boolean = false): Promise<boolean> => {
     let transactionsToUpdate: { id: string, data: any }[] = [];
 
     if (!updateSeries) {
       transactionsToUpdate.push({ id, data: updates });
     } else {
       const original = allTransactions.find(t => t.id === id);
-      if (!original) return;
+      if (!original) return false;
 
       let siblings: Transaction[] = [];
 
@@ -308,14 +309,17 @@ const App: React.FC = () => {
 
     const promises = transactionsToUpdate.map(t => updateTransactionService(t.id, t.data));
     const results = await Promise.all(promises);
+    
     if (results.some(r => r === null)) {
       setGlobalAlert({ 
         show: true, 
         message: "Erro ao atualizar uma ou mais transações. Verifique os campos no Appwrite (Ex: atributos obrigatórios ausentes)." 
       });
+      return false;
     }
 
     setTransactionToEdit(null);
+    return true;
   };
 
   const handleToggleStatus = async (t: Transaction) => {
@@ -432,6 +436,7 @@ const App: React.FC = () => {
 
   const navItems = [
     { view: View.DASHBOARD, label: 'Início', icon: LayoutDashboard },
+    { view: View.SIMULATION, label: 'Simulação', icon: CalendarRange },
     { view: View.CALENDAR, label: 'Calendário', icon: CalendarIcon },
     { view: View.BUDGETS, label: 'Planejamento', icon: PieChart },
     { view: View.SHOPPING_LIST, label: 'Lista', icon: ShoppingCart },
@@ -629,6 +634,14 @@ const App: React.FC = () => {
                 onEditTransaction={openEditModal}
                 onToggleStatus={handleToggleStatus}
                 onAdjustBalance={handleAdjustBalance}
+                privacyMode={privacyMode}
+              />
+            )}
+            {currentView === View.SIMULATION && (
+              <CashFlowSimulation
+                transactions={allTransactions}
+                accounts={accounts}
+                onStatusToggle={handleToggleStatus}
                 privacyMode={privacyMode}
               />
             )}
