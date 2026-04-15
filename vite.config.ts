@@ -48,7 +48,14 @@ export default defineConfig(({ mode }) => {
       })
     ],
     define: {
-      'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY || '')
+      'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY || ''),
+      'import.meta.env.VITE_APPWRITE_ENDPOINT': JSON.stringify(env.VITE_APPWRITE_ENDPOINT || 'https://cloud.appwrite.io/v1'),
+      'import.meta.env.VITE_APPWRITE_PROJECT_ID': JSON.stringify(env.VITE_APPWRITE_PROJECT_ID || ''),
+      'import.meta.env.VITE_APPWRITE_DATABASE_ID': JSON.stringify(env.VITE_APPWRITE_DATABASE_ID || ''),
+      'import.meta.env.VITE_APPWRITE_TRANSACTIONS_COLLECTION_ID': JSON.stringify(env.VITE_APPWRITE_TRANSACTIONS_COLLECTION_ID || ''),
+      'import.meta.env.VITE_APPWRITE_ACCOUNTS_COLLECTION_ID': JSON.stringify(env.VITE_APPWRITE_ACCOUNTS_COLLECTION_ID || ''),
+      'import.meta.env.VITE_APPWRITE_BUDGETS_COLLECTION_ID': JSON.stringify(env.VITE_APPWRITE_BUDGETS_COLLECTION_ID || ''),
+      'import.meta.env.VITE_APPWRITE_GOALS_COLLECTION_ID': JSON.stringify(env.VITE_APPWRITE_GOALS_COLLECTION_ID || ''),
     },
   };
 });
