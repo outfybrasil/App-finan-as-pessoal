@@ -272,7 +272,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   return (
     <>
-      <div className="space-y-6 pb-24 md:space-y-8 md:pb-0">
+      <div className="space-y-6 pb-4 md:space-y-8 md:pb-0">
 
         {/* Header & Month Selector */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 md:gap-6">
@@ -291,7 +291,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             )}
           </div>
 
-          <div className="flex w-full md:w-auto items-center justify-between glass rounded-[1.75rem] p-1.5 shadow-xl">
+          <div className="flex w-full md:w-auto items-center justify-between bg-zinc-900 border border-white/5 rounded-xl p-1 shadow-sm">
             <button onClick={prevMonth} className="p-3 hover:bg-white/10 rounded-xl text-slate-400 hover:text-white transition-all">
               <ChevronLeft size={20} />
             </button>
@@ -308,16 +308,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
 
           {/* Main Balance Card - MENSAL ISOLADO */}
-          <div className="md:col-span-6 relative overflow-hidden rounded-[2rem] md:rounded-[2.5rem] bg-slate-900 border border-white/5 shadow-2xl group">
-            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/20 via-transparent to-teal-500/10 opacity-50" />
-            <div className="absolute -top-24 -right-24 w-64 h-64 bg-emerald-500/10 blur-[100px] rounded-full" />
-            <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-teal-500/10 blur-[100px] rounded-full" />
+          <div className="md:col-span-6 relative overflow-hidden rounded-2xl bg-zinc-900 border border-white/5 shadow-sm group">
             
             <div className="absolute top-0 right-0 p-6 md:p-8 opacity-5 transform group-hover:scale-110 transition-transform duration-1000">
               <Wallet size={160} className="text-white" />
             </div>
 
-            <div className="relative p-6 md:p-10 h-full flex flex-col justify-between z-10">
+            <div className="relative p-6 md:p-8 h-full flex flex-col justify-between z-10">
               <div>
                 <div className="flex items-center gap-2 text-emerald-400/80 mb-3">
                   <div className="p-2 bg-emerald-500/10 rounded-xl backdrop-blur-md border border-emerald-500/20">
@@ -394,7 +391,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <div className="md:col-span-6 grid grid-cols-2 gap-4 md:gap-6">
 
             {/* Income Card (Month) */}
-            <div className="glass-card p-4 md:p-6 rounded-[1.75rem] md:rounded-[2rem] flex flex-col justify-between hover:border-emerald-500/30 transition-all duration-300 group min-h-[154px]">
+            {/* Income Card (Month) */}
+            <div className="bg-zinc-900 border border-white/5 p-6 rounded-2xl flex flex-col justify-between hover:border-emerald-500/30 transition-all duration-300 group min-h-[154px]">
               <div className="flex justify-between items-start">
                 <div className="p-3 bg-emerald-500/10 rounded-2xl text-emerald-500 group-hover:bg-emerald-500 group-hover:text-black transition-all duration-300">
                   <TrendingUp size={20} />
@@ -414,7 +412,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
 
             {/* Expense Card (Month) */}
-            <div className="glass-card p-4 md:p-6 rounded-[1.75rem] md:rounded-[2rem] flex flex-col justify-between hover:border-rose-500/30 transition-all duration-300 group min-h-[154px]">
+            {/* Expense Card (Month) */}
+            <div className="bg-zinc-900 border border-white/5 p-6 rounded-2xl flex flex-col justify-between hover:border-rose-500/30 transition-all duration-300 group min-h-[154px]">
               <div className="flex justify-between items-start">
                 <div className="p-3 bg-rose-500/10 rounded-2xl text-rose-500 group-hover:bg-rose-500 group-hover:text-white transition-all duration-300">
                   <TrendingDown size={20} />
@@ -434,7 +433,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
 
             {/* Budget Summary Mini-Card */}
-            <div className="col-span-2 bg-slate-800/30 p-4 rounded-[1.75rem] border border-slate-800 flex items-center justify-between gap-4">
+            {/* Budget Summary Mini-Card */}
+            <div className="col-span-2 bg-zinc-900 p-4 rounded-xl border border-white/5 flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-slate-700 rounded-xl text-slate-300">
                   <PiggyBank size={20} />
@@ -453,10 +453,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
         {/* Account Balances Section (Horizontal Scroll) - MENSAL ISOLADO */}
         <div className="w-full overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 md:px-0">
-          <div className="mb-3 flex items-center justify-between px-1">
+          <div className="mb-4 flex items-center justify-between px-1">
             <div>
-              <h3 className="text-sm font-black uppercase tracking-[0.22em] text-slate-300">Contas</h3>
-              <p className="text-xs text-slate-500 mt-1">Toque em uma conta para ajustar o saldo do mês.</p>
+              <h3 className="text-sm font-bold tracking-tight text-zinc-100">Contas</h3>
+              <p className="text-xs text-zinc-500 mt-1">Toque em uma conta para ajustar o saldo do mês.</p>
             </div>
           </div>
 
@@ -465,23 +465,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <div
                 key={acc.name}
                 onClick={() => handleAccountClick(acc.name as string, acc.balance)}
-                className="bg-slate-800/50 p-4 rounded-[1.5rem] border border-slate-700 min-w-[180px] md:min-w-[200px] flex flex-col justify-between transition-all group cursor-pointer hover:border-emerald-500/50 hover:bg-slate-800 snap-start"
+                className="bg-zinc-900 p-5 rounded-2xl border border-white/5 min-w-[180px] md:min-w-[200px] flex flex-col justify-between transition-all group cursor-pointer hover:border-zinc-700 snap-start"
               >
-                {/* Micro-accent */}
-                <div className="absolute top-0 right-0 w-8 h-8 bg-blue-500/5 rotate-45 translate-x-4 -translate-y-4 group-hover:bg-blue-500/20 transition-all" />
-                
-                <div className="flex items-center justify-between text-slate-500 mb-4">
-                  <div className="flex items-center gap-2.5">
-                    <div className="p-1.5 bg-slate-800 rounded-sm text-slate-400 group-hover:text-blue-400 transition-colors">
+                <div className="flex items-center justify-between text-zinc-500 mb-4">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 bg-zinc-800 rounded-md text-zinc-400 group-hover:text-zinc-200 transition-colors">
                       <CreditCard size={14} />
                     </div>
-                    <span className="text-[11px] font-black uppercase tracking-[0.15em]">{acc.name}</span>
+                    <span className="text-[11px] font-bold tracking-wide text-zinc-300">{acc.name}</span>
                   </div>
-                  <Edit2 size={14} className="opacity-70 md:opacity-0 md:group-hover:opacity-100 transition-opacity" />
+                  <Edit2 size={14} className="opacity-0 md:group-hover:opacity-100 transition-opacity" />
                 </div>
                 <div className="flex flex-col">
-                  <span className="text-[9px] text-slate-600 uppercase font-black tracking-[0.2em] mb-1.5">Saldo Disponível</span>
-                  <p className={`text-xl font-black ${acc.balance >= 0 ? 'text-slate-100' : 'text-rose-500/80'} ${privacyClassText} tracking-tighter`}>
+                  <span className="text-[10px] text-zinc-500 font-medium mb-1">Saldo Disponível</span>
+                  <p className={`text-xl font-bold ${acc.balance >= 0 ? 'text-zinc-100' : 'text-rose-500'} ${privacyClassText} tracking-tight`}>
                     R$ {acc.balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </p>
                 </div>
@@ -502,20 +499,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
           {/* Transactions List */}
           <div className="lg:col-span-7 space-y-4">
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4 mt-8">
               <div>
-                <h3 className="text-xl font-extrabold text-white tracking-tight">Movimentações</h3>
-                <p className="text-xs text-slate-500 mt-1">Toque em um item para editar ou marque rapidamente como concluído.</p>
+                <h3 className="text-lg font-bold text-zinc-100 tracking-tight">Movimentações</h3>
+                <p className="text-xs text-zinc-500 mt-1">Toque para editar ou marque como concluído.</p>
               </div>
-              <div className="flex glass rounded-2xl p-1 shadow-inner overflow-x-auto">
+              <div className="flex bg-zinc-900 border border-white/5 rounded-xl p-1 overflow-x-auto">
                 {/* Botões de Filtro Atualizados */}
                 {(['all', 'income', 'expense', 'pending'] as const).map(type => (
                   <button
                     key={type}
                     onClick={() => setFilterType(type)}
-                    className={`px-4 py-2 text-[10px] font-black uppercase tracking-[0.15em] rounded-sm transition-all whitespace-nowrap ${filterType === type
-                      ? 'bg-slate-100 text-black shadow-lg shadow-white/5'
-                      : 'text-slate-500 hover:text-white hover:bg-white/5'
+                    className={`px-4 py-2 text-[11px] font-medium rounded-lg transition-colors whitespace-nowrap ${filterType === type
+                      ? 'bg-zinc-800 text-zinc-100'
+                      : 'text-zinc-500 hover:text-zinc-300'
                       }`}
                   >
                     {type === 'all' ? 'Tudo' : type === 'income' ? 'Entradas' : type === 'expense' ? 'Saídas' : 'Pendentes'}
@@ -533,7 +530,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 return (
                   <div
                     key={t.id}
-                    className={`group flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between p-5 transition-all duration-200 border-b border-white/5 relative overflow-hidden
+                    onClick={() => onEditTransaction(t)}
+                    className={`group flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between p-5 transition-all duration-200 border-b border-white/5 relative overflow-hidden cursor-pointer
                     ${isPaid
                         ? 'bg-slate-950/40 hover:bg-white/[0.03]'
                         : 'bg-slate-900/10 opacity-60'
@@ -545,10 +543,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       ${!isPaid ? 'opacity-30' : 'opacity-100'}
                     `} />
 
-                    <div
-                      onClick={() => onEditTransaction(t)}
-                      className="flex items-center gap-5 flex-1 cursor-pointer min-w-0"
-                    >
+                    <div className="flex items-center gap-5 flex-1 min-w-0">
                       <div className={`w-11 h-11 rounded-sm flex items-center justify-center shrink-0 border transition-all duration-500
                       ${t.type === 'income'
                           ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-500 group-hover:bg-emerald-500 group-hover:text-black'
@@ -595,8 +590,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
                     <div className="flex items-center justify-between sm:flex-col sm:items-end gap-3 sm:gap-2">
                       <span
-                        onClick={() => onEditTransaction(t)}
-                        className={`font-black text-base sm:text-[17px] tracking-tighter cursor-pointer transition-all ${!isPaid ? 'text-slate-700' :
+                        className={`font-black text-base sm:text-[17px] tracking-tighter transition-all ${!isPaid ? 'text-slate-700' :
                           privacyMode ? privacyClassText :
                             (t.type === 'income' ? 'text-emerald-400' : isTransfer ? 'text-blue-400' : 'text-slate-100')
                           }`}

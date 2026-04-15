@@ -36,7 +36,7 @@ export const SmartGoals: React.FC<SmartGoalsProps> = ({ goals = [], onAddGoal, o
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {goals.map((goal, index) => {
-                    const progress = calculateProgress(goal.savedAmount || 0, goal.targetAmount);
+                    const progress = calculateProgress(goal.currentAmount || 0, goal.targetAmount);
                     const isCompleted = progress >= 100;
 
                     return (
@@ -97,7 +97,7 @@ export const SmartGoals: React.FC<SmartGoalsProps> = ({ goals = [], onAddGoal, o
                                         <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Acumulado</p>
                                         <p className="text-xl font-bold text-white">
                                             <span className="text-sm opacity-50 mr-1">R$</span>
-                                            {(goal.savedAmount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                            {(goal.currentAmount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                         </p>
                                     </div>
                                     

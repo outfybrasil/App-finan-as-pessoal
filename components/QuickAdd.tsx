@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTravelMode } from '../context/TravelContext';
 import { Transaction, TransactionType } from '../types';
-import { TrendingUp, TrendingDown, FileText, X, CalendarClock, Trash2, Layers, Info, CheckCircle2, Clock, CreditCard, Plus, Minus, Calculator, ChevronRight } from 'lucide-react';
+import { TrendingUp, TrendingDown, FileText, X, CalendarClock, Trash2, Layers, Info, CheckCircle2, Clock, CreditCard, Plus, Minus, Calculator, ChevronRight, ArrowDownCircle, ArrowUpCircle, PiggyBank, Save } from 'lucide-react';
 import { CustomDialog } from './CustomDialog';
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, ACCOUNT_OPTIONS } from '../constants/categories';
 
@@ -109,6 +109,14 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
       setDescription(rawDesc);
       setIsSeries(detectedSeries);
 
+      if (initialData.tags) {
+        const reserveTag = initialData.tags.find(t => t.startsWith('#reserva:'));
+        if (reserveTag) {
+          setEnvelope(reserveTag.replace('#reserva:', ''));
+          setUseEnvelope(true);
+        }
+      }
+
       if (initialData.splits && initialData.splits.length > 0) {
         setIsSplitMode(true);
         setSplits(initialData.splits);
@@ -162,7 +170,8 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
       installments: isInstallmentMode ? installments : 1,
       currentInstallment: currentInstallment,
       splits: isSplitMode ? splits : undefined,
-      destinationAccount: type === 'transfer' ? destinationAccount : undefined
+      destinationAccount: type === 'transfer' ? destinationAccount : undefined,
+      tags: initialData?.tags || []
     };
 
     if (isEditing && onEdit) {
@@ -185,7 +194,8 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
         payload.currentInstallment,
         payload.isPaid,
         payload.splits,
-        payload.destinationAccount
+        payload.destinationAccount,
+        payload.tags
       );
     }
     onClose();
@@ -243,13 +253,13 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
 
   return (
     <>
-      <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-md z-50 flex items-end md:items-center justify-center p-0 md:p-4 animate-in fade-in duration-300">
-        <div className="glass-card border-white/10 rounded-t-[2.25rem] md:rounded-[2.5rem] w-full max-w-lg shadow-2xl overflow-hidden animate-in slide-in-from-bottom-6 md:zoom-in-95 duration-300 flex flex-col max-h-[92dvh] md:max-h-[90vh]">
+      <div className="fixed inset-0 bg-zinc-950/80 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4 animate-in fade-in duration-300">
+        <div className="bg-zinc-950 border-t md:border border-white/5 rounded-t-3xl md:rounded-2xl w-full max-w-lg overflow-hidden animate-in slide-in-from-bottom-6 md:zoom-in-95 duration-300 flex flex-col max-h-[92dvh] md:max-h-[90vh] shadow-2xl shadow-black/50">
           <div className="flex justify-center pt-3 md:hidden">
-            <div className="h-1.5 w-14 rounded-full bg-white/15" />
+            <div className="h-1 w-12 rounded-full bg-zinc-800" />
           </div>
 
-          <div className="flex justify-between items-center p-5 md:p-8 border-b border-white/5 shrink-0 bg-white/5">
+          <div className="flex justify-between items-center p-6 md:p-8 border-b border-white/5 shrink-0 bg-zinc-900/50">
             <div>
               <h2 className="text-xl md:text-2xl font-black text-white tracking-tight">
                 {isEditing ? 'Editar Registro' : 'Novo Registro'}
@@ -263,7 +273,7 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
 
           <form onSubmit={handleSubmit} className="p-5 md:p-8 space-y-6 md:space-y-8 overflow-y-auto custom-scrollbar">
             {/* Type Selector */}
-            <div className="flex gap-4 p-1.5 glass rounded-2xl">
+            <div className="flex gap-4 p-1.5 bg-zinc-900 border border-white/5 rounded-2xl">
               <button
                 type="button"
                 onClick={() => setType('expense')}
@@ -302,7 +312,7 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
                   onChange={(e) => setAmount(parseFloat(e.target.value) || 0)}
                   placeholder="0,00"
                   autoFocus
-                  className="w-full bg-white/5 border border-white/5 rounded-sm px-6 py-6 pl-14 text-4xl font-black text-white outline-none focus:bg-white/10 transition-all font-sans tracking-tighter"
+                  className="w-full bg-zinc-900 border border-white/5 rounded-xl px-6 py-6 pl-14 text-4xl font-black text-zinc-100 outline-none focus:border-zinc-700 transition-all font-sans tracking-tighter"
                 />
               </div>
               {isInstallmentMode && !isEditing && amount && (
@@ -324,8 +334,7 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder={type === 'income' ? "Ex: Salário Mensal" : "Ex: Compra de TV"}
-                  className="w-full bg-white/5 border border-white/5 rounded-2xl px-5 py-4 pl-12 text-white font-bold placeholder:text-slate-700 outline-none focus:border-white/10 transition-all"
-                  required
+                  className="w-full bg-zinc-900 border border-white/5 rounded-xl px-5 py-4 pl-12 text-zinc-100 font-bold placeholder:text-zinc-600 outline-none focus:border-zinc-700 transition-all"
                 />
               </div>
             </div>
@@ -339,10 +348,10 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
                   <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
-                    className="w-full bg-white/5 border border-white/5 rounded-2xl px-5 py-4 pl-12 text-white font-bold outline-none appearance-none cursor-pointer focus:bg-white/10 transition-all"
+                    className="w-full bg-zinc-900 border border-white/5 rounded-xl px-5 py-4 pl-12 text-zinc-100 font-bold outline-none appearance-none cursor-pointer focus:border-zinc-700 transition-all"
                     required
                   >
-                    <option value="" disabled className="bg-slate-900">Selecione</option>
+                    <option value="" disabled className="bg-zinc-950">Selecione</option>
                     {(type === 'expense' ? EXPENSE_CATEGORIES : INCOME_CATEGORIES).map(cat => (
                       <option key={cat} value={cat} className="bg-slate-900">{cat}</option>
                     ))}
@@ -358,7 +367,7 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
                     type="date"
                     value={date}
                     onChange={(e) => setDate(e.target.value)}
-                    className="w-full bg-white/5 border border-white/5 rounded-2xl px-5 py-4 pl-12 text-white font-bold outline-none cursor-pointer focus:bg-white/10 transition-all [color-scheme:dark]"
+                    className="w-full bg-zinc-900 border border-white/5 rounded-xl px-5 py-4 pl-12 text-zinc-100 font-bold outline-none cursor-pointer focus:border-zinc-700 transition-all [color-scheme:dark]"
                     required
                   />
                 </div>
@@ -375,10 +384,10 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
                     <select
                       value={account}
                       onChange={(e) => setAccount(e.target.value)}
-                      className="w-full bg-white/5 border border-white/5 rounded-sm px-5 py-4 pl-12 text-white font-bold outline-none appearance-none cursor-pointer focus:bg-white/10 transition-all font-sans"
+                      className="w-full bg-zinc-900 border border-white/5 rounded-xl px-5 py-4 pl-12 text-zinc-100 font-bold outline-none appearance-none cursor-pointer focus:border-zinc-700 transition-all font-sans"
                     >
                       {ACCOUNT_OPTIONS.map(acc => (
-                        <option key={acc} value={acc} className="bg-slate-900">{acc}</option>
+                        <option key={acc} value={acc} className="bg-zinc-950">{acc}</option>
                       ))}
                     </select>
                   </div>
@@ -393,7 +402,7 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
                     <select
                       value={destinationAccount}
                       onChange={(e) => setDestinationAccount(e.target.value)}
-                      className="w-full bg-blue-500/5 border border-blue-500/20 rounded-sm px-5 py-4 pl-12 text-white font-bold outline-none appearance-none cursor-pointer focus:bg-blue-500/10 transition-all font-sans"
+                      className="w-full bg-blue-500/5 border border-blue-500/20 rounded-xl px-5 py-4 pl-12 text-zinc-100 font-bold outline-none appearance-none cursor-pointer focus:bg-blue-500/10 transition-all font-sans"
                     >
                       {ACCOUNT_OPTIONS.map(acc => (
                         <option key={acc} value={acc} className="bg-slate-900">{acc}</option>
@@ -415,7 +424,7 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
                   <select
                     value={account}
                     onChange={(e) => setAccount(e.target.value)}
-                    className="w-full bg-white/5 border border-white/5 rounded-sm px-5 py-4 pl-12 text-white font-bold outline-none appearance-none cursor-pointer focus:bg-white/10 transition-all"
+                    className="w-full bg-zinc-900 border border-white/5 rounded-xl px-5 py-4 pl-12 text-zinc-100 font-bold outline-none appearance-none cursor-pointer focus:border-zinc-700 transition-all"
                   >
                     {ACCOUNT_OPTIONS.map(acc => (
                       <option key={acc} value={acc} className="bg-slate-900">{acc}</option>
@@ -429,9 +438,9 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
             <div className="space-y-4">
               <div
                 onClick={() => setIsPaid(!isPaid)}
-                className={`group flex items-center gap-4 p-5 rounded-[2rem] border transition-all cursor-pointer ${isPaid
+                className={`group flex items-center gap-4 p-5 rounded-2xl border transition-all cursor-pointer ${isPaid
                   ? 'bg-emerald-500/5 border-emerald-500/20'
-                  : 'glass border-white/5'
+                  : 'bg-zinc-900 border-white/5'
                   }`}
               >
                 <div className={`w-12 h-12 rounded-2xl shadow-lg flex items-center justify-center shrink-0 transition-all duration-500 ${isPaid
@@ -452,7 +461,7 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
               </div>
 
               {type === 'expense' && (
-                <div className={`group flex flex-col gap-4 p-5 rounded-[2rem] border transition-all ${isSplitMode ? 'bg-amber-500/5 border-amber-500/20' : 'glass border-white/5'}`}>
+                <div className={`group flex flex-col gap-4 p-5 rounded-2xl border transition-all ${isSplitMode ? 'bg-amber-500/5 border-amber-500/20' : 'bg-zinc-900 border-white/5'}`}>
                   <div className="flex items-center gap-4 cursor-pointer" onClick={() => {
                     setIsSplitMode(!isSplitMode);
                     if (!isSplitMode && splits.length === 0) {
@@ -529,7 +538,7 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
               )}
 
               {/* Advanced Options */}
-              <div className="glass rounded-[2rem] p-6 space-y-6 border-white/5">
+              <div className="bg-zinc-900 rounded-2xl p-6 space-y-6 border border-white/5">
                 <div className="flex items-center justify-between group">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-slate-500">
@@ -580,7 +589,7 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
                             min="1"
                             value={currentInstallment}
                             onChange={(e) => setCurrentInstallment(Math.max(1, parseInt(e.target.value) || 1))}
-                            className="w-full bg-white/5 border border-white/5 rounded-xl py-3 text-center text-white font-black outline-none focus:border-amber-500/50"
+                            className="w-full bg-zinc-950 border border-white/5 rounded-xl py-3 text-center text-zinc-100 font-bold outline-none focus:border-zinc-700"
                           />
                         </div>
                         <div className="space-y-2">
@@ -591,7 +600,7 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
                             max="60"
                             value={installments}
                             onChange={(e) => setInstallments(Math.max(1, parseInt(e.target.value) || 1))}
-                            className="w-full bg-white/5 border border-white/5 rounded-xl py-3 text-center text-white font-black outline-none focus:border-emerald-500/50"
+                            className="w-full bg-zinc-950 border border-white/5 rounded-xl py-3 text-center text-zinc-100 font-bold outline-none focus:border-zinc-700"
                           />
                         </div>
                       </div>
@@ -602,23 +611,24 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
             </div>
 
             {/* Footer Actions */}
-            <div className="sticky bottom-0 -mx-5 md:-mx-8 mt-2 border-t border-white/5 bg-gradient-to-t from-slate-950 via-slate-950/95 to-transparent px-5 md:px-8 pt-4 pb-4 pb-safe">
+            <div className="sticky bottom-0 -mx-5 md:-mx-8 mt-2 border-t border-white/5 bg-zinc-950 px-5 md:px-8 pt-4 pb-4 pb-safe">
               <div className="flex gap-4">
               {isEditing && (
                 <button
                   type="button"
                   onClick={handleDeleteClick}
-                  className="w-16 h-16 rounded-[1.5rem] bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-500 hover:bg-rose-500 hover:text-white transition-all shadow-lg hover:shadow-rose-500/20"
+                  className="w-14 h-14 shrink-0 rounded-xl bg-transparent border border-rose-500/30 flex items-center justify-center text-rose-500 hover:bg-rose-500 hover:text-white transition-all outline-none"
                 >
                   <Trash2 size={24} />
                 </button>
               )}
-              <button
-                type="submit"
-                className="flex-1 bg-gradient-to-tr from-emerald-500 to-emerald-400 text-white rounded-[1.5rem] py-5 px-8 font-black text-sm uppercase tracking-[0.2em] shadow-xl shadow-emerald-500/20 hover:shadow-emerald-500/40 hover:-translate-y-1 active:scale-95 transition-all outline-none"
-              >
-                {isEditing ? 'Salvar Alterações' : 'Confirmar Lançamento'}
-              </button>
+                <button
+                  type="submit"
+                  className="w-full h-14 rounded-xl flex items-center justify-center gap-3 bg-emerald-500 text-zinc-950 font-bold tracking-wide transition-all shadow-md mt-2 md:mt-0 hover:bg-emerald-400 active:scale-95"
+                >
+                  <Save size={20} className="stroke-[2.5]" />
+                  {isEditing ? 'Salvar Alterações' : 'Salvar Registro'}
+                </button>
               </div>
             </div>
           </form>

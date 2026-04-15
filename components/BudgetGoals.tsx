@@ -3,6 +3,7 @@ import { Budget, Goal, Transaction } from '../types';
 import { Target, Trophy, Plus, Edit2, Wallet, TrendingUp, ChevronRight, Calculator } from 'lucide-react';
 import { GoalModal } from './GoalModal';
 import { BudgetModal } from './BudgetModal';
+import { SmartGoals } from './SmartGoals';
 
 interface BudgetGoalsProps {
   budgets: Budget[];
@@ -163,98 +164,11 @@ export const BudgetGoals: React.FC<BudgetGoalsProps> = ({
 
       {/* Goals Section */}
       <section>
-        <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 mt-16">
-          <div>
-            <h1 className="text-4xl font-black text-white tracking-tight flex items-center gap-4">
-              <div className="p-3 bg-amber-500/10 rounded-2xl border border-amber-500/20 text-amber-400 shadow-lg shadow-amber-500/5">
-                <Trophy size={32} />
-              </div>
-              Metas SMART
-            </h1>
-            <p className="text-slate-500 font-bold mt-2 ml-16">Transforme seus sonhos em planos realizáveis</p>
-          </div>
-
-          <button
-            onClick={() => setShowGoalModal(true)}
-            className="bg-amber-500/10 hover:bg-amber-500 text-amber-400 hover:text-white rounded-2xl px-6 py-4 flex items-center gap-3 font-black text-xs uppercase tracking-widest transition-all border border-amber-500/20 active:scale-95 group"
-          >
-            <Plus size={18} className="group-hover:rotate-90 transition-transform" />
-            Nova Meta
-          </button>
-        </header>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {goals.map(goal => {
-            const percentage = Math.min((goal.currentAmount / goal.targetAmount) * 100, 100);
-            const isCompleted = goal.status === 'completed' || percentage >= 100;
-            
-            return (
-              <div
-                key={goal.id}
-                onClick={() => handleEditGoal(goal)}
-                className={`glass-card p-6 rounded-[2rem] border transition-all cursor-pointer hover:shadow-2xl group flex flex-col h-full ${
-                  isCompleted 
-                    ? 'border-emerald-500/30 bg-emerald-500/[0.02]' 
-                    : 'border-white/5 hover:border-amber-500/30'
-                }`}
-              >
-                <div className="flex justify-between items-start mb-6">
-                  <div className="w-14 h-14 bg-slate-950/50 rounded-2xl border border-white/5 flex items-center justify-center text-3xl shadow-inner group-hover:scale-110 transition-transform">
-                    {goal.icon || '🎯'}
-                  </div>
-                  <div className="text-slate-600 group-hover:text-white transition-all">
-                    <Edit2 size={16} />
-                  </div>
-                </div>
-
-                <div className="flex-1">
-                  <h3 className={`font-black text-xl tracking-tight leading-tight mb-1 ${isCompleted ? 'text-emerald-400' : 'text-white'}`}>
-                    {goal.name}
-                  </h3>
-                  <div className="flex items-center gap-2 mb-6">
-                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">
-                      {isCompleted ? 'Concluída ✨' : `Alvo: ${new Date(goal.deadline).toLocaleDateString('pt-BR')}`}
-                    </p>
-                  </div>
-
-                  <div className="flex items-baseline gap-2 mb-4">
-                    <span className={`text-2xl font-black text-white ${privacyClass}`}>
-                      R$ {goal.currentAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </span>
-                    <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">
-                      / <span className={privacyMode ? 'blur-xs' : ''}>{goal.targetAmount.toLocaleString('pt-BR', { compactDisplay: 'short', notation: 'compact' })}</span>
-                    </span>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="h-3 bg-slate-900 rounded-full overflow-hidden border border-white/5 p-0.5">
-                      <div
-                        className={`h-full rounded-full transition-all duration-1000 ease-out ${
-                          isCompleted ? 'bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.3)]' : 'bg-gradient-to-r from-amber-600 to-amber-400'
-                        }`}
-                        style={{ width: `${percentage}%` }}
-                      ></div>
-                    </div>
-                    <div className="flex justify-between items-center text-[9px] font-black text-slate-500 uppercase tracking-widest">
-                      <span>Progresso</span>
-                      <span className={isCompleted ? 'text-emerald-400' : 'text-slate-300'}>{percentage.toFixed(0)}%</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-
-          <button
-            onClick={() => setShowGoalModal(true)}
-            className="bg-transparent py-10 rounded-[2rem] border-2 border-dashed border-white/5 flex flex-col items-center justify-center gap-4 text-slate-600 hover:text-amber-400 hover:border-amber-500/20 hover:bg-amber-500/5 transition-all group min-h-[250px]"
-          >
-            <div className="w-14 h-14 rounded-full bg-slate-900 flex items-center justify-center group-hover:rotate-12 transition-transform">
-              <Plus size={28} />
-            </div>
-            <span className="font-black text-xs uppercase tracking-[0.2em]">Nova Meta Financeira</span>
-          </button>
-        </div>
+        <SmartGoals 
+          goals={goals} 
+          onAddGoal={() => setShowGoalModal(true)} 
+          onUpdateGoal={handleEditGoal} 
+        />
       </section>
 
       {/* Modals Rendering */}

@@ -7,7 +7,6 @@ import { BudgetGoals } from './components/BudgetGoals';
 import { Reports } from './components/Reports';
 import { ShoppingList } from './components/ShoppingList';
 import { CalendarView } from './components/CalendarView';
-import { CashFlowSimulation } from './components/CashFlowSimulation';
 import { Auth } from './components/Auth';
 import { useAuth } from './hooks/useAuth';
 import { useFinance } from './hooks/useFinance';
@@ -104,7 +103,8 @@ const App: React.FC = () => {
     currentInstallment: number = 1,
     isPaid: boolean = true,
     splits?: { account: string; amount: number }[],
-    destinationAccount?: string
+    destinationAccount?: string,
+    tags?: string[]
   ) => {
 
     const newTransactions: any[] = [];
@@ -130,7 +130,8 @@ const App: React.FC = () => {
           type,
           isRecurring: false,
           isPaid: isThisInstallmentPaid,
-          splits: (i === currentInstallment) ? splits : undefined // Only split the first installment for now (simplification)
+          splits: (i === currentInstallment) ? splits : undefined, // Only split the first installment for now (simplification)
+          tags // Passa a tag (envelope)
         });
         monthOffset++;
       }
@@ -155,7 +156,8 @@ const App: React.FC = () => {
           isRecurring: true,
           isPaid: isThisItemPaid,
           splits: (i === 0) ? splits : undefined,
-          destinationAccount: (i === 0) ? destinationAccount : undefined
+          destinationAccount: (i === 0) ? destinationAccount : undefined,
+          tags // Passa a tag
         });
       }
     }
@@ -170,7 +172,8 @@ const App: React.FC = () => {
         isRecurring,
         isPaid,
         splits,
-        destinationAccount
+        destinationAccount,
+        tags // Passa a tag
       });
     }
 
@@ -436,7 +439,6 @@ const App: React.FC = () => {
 
   const navItems = [
     { view: View.DASHBOARD, label: 'Início', icon: LayoutDashboard },
-    { view: View.SIMULATION, label: 'Simulação', icon: CalendarRange },
     { view: View.CALENDAR, label: 'Calendário', icon: CalendarIcon },
     { view: View.BUDGETS, label: 'Planejamento', icon: PieChart },
     { view: View.SHOPPING_LIST, label: 'Lista', icon: ShoppingCart },
@@ -467,7 +469,6 @@ const App: React.FC = () => {
   if (!user) {
     return <Auth />;
   }
-
   if (dataLoading) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-400">
@@ -478,20 +479,20 @@ const App: React.FC = () => {
       </div>
     );
   }
-
   return (
     <TravelProvider>
+  
       <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col md:flex-row font-sans overflow-x-hidden">
 
         {/* Desktop Sidebar */}
-        <aside className="hidden md:flex flex-col w-72 border-r border-white/5 bg-slate-950/40 backdrop-blur-2xl p-8 fixed h-full z-20">
-          <div className="flex items-center gap-4 mb-12 px-2">
-            <div className="w-10 h-10 bg-gradient-to-tr from-emerald-400 to-emerald-600 rounded-2xl flex items-center justify-center shadow-[0_0_20px_rgba(52,211,153,0.3)] rotate-3">
-              <Wallet size={20} className="text-white" />
+        <aside className="hidden md:flex flex-col w-72 border-r border-white/5 bg-zinc-950 p-6 fixed h-full z-20">
+          <div className="flex items-center gap-3 mb-10 px-2">
+            <div className="w-10 h-10 bg-zinc-900 border border-white/10 rounded-lg flex items-center justify-center">
+              <Wallet size={20} className="text-emerald-500" />
             </div>
             <div className="flex flex-col">
-              <span className="font-black text-xl tracking-tight text-white leading-none">FLUXO</span>
-              <span className="text-[10px] font-black text-emerald-500/50 uppercase tracking-[0.3em] mt-1">Premium</span>
+              <span className="font-bold text-lg tracking-tight text-zinc-100 leading-none">Fluxo</span>
+              <span className="text-[10px] text-zinc-500 uppercase tracking-widest mt-1">App</span>
             </div>
           </div>
 
@@ -506,9 +507,9 @@ const App: React.FC = () => {
                   }`}
               >
                 <item.icon size={22} className={currentView === item.view ? 'text-emerald-400' : 'text-slate-600 group-hover:text-slate-400 transition-colors'} />
-                <span className="text-sm tracking-tight">{item.label}</span>
+                <span className="text-sm tracking-tight font-medium">{item.label}</span>
                 {currentView === item.view && (
-                  <div className="ml-auto w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]" />
+                  <div className="ml-auto w-1.5 h-1.5 rounded-full bg-emerald-500" />
                 )}
               </button>
             ))}
@@ -538,9 +539,9 @@ const App: React.FC = () => {
             <div className="pt-4">
               <button
                 onClick={() => { setTransactionToEdit(null); setShowQuickAdd(true); }}
-                className="bg-emerald-500 hover:bg-emerald-400 text-white rounded-2xl py-4 px-6 flex items-center justify-center gap-3 font-black text-sm uppercase tracking-widest transition-all shadow-[0_10px_30px_rgba(16,185,129,0.25)] w-full hover:shadow-[0_15px_40px_rgba(16,185,129,0.35)] hover:-translate-y-1 active:scale-95"
+                className="bg-emerald-500 text-zinc-950 rounded-lg h-12 w-full flex items-center justify-center gap-2 font-bold text-sm transition-colors hover:bg-emerald-400 active:scale-95"
               >
-                <Plus size={20} className="stroke-[3]" />
+                <Plus size={18} className="stroke-[2.5]" />
                 Registrar
               </button>
             </div>
@@ -558,72 +559,66 @@ const App: React.FC = () => {
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 md:ml-72 p-6 pt-4 pb-36 md:p-12 md:pb-12 overflow-y-auto min-h-screen relative bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.08),_transparent_28%),linear-gradient(180deg,_#020617_0%,_#020617_48%,_#04111f_100%)]">
-          {/* Decorative Elements */}
-          <div className="fixed top-[-10%] left-[-10%] w-[40%] h-[40%] bg-emerald-500/5 rounded-full blur-[120px] pointer-events-none" />
-          <div className="fixed bottom-[-10%] right-[-10%] w-[30%] h-[30%] bg-blue-500/5 rounded-full blur-[100px] pointer-events-none" />
-
-          {/* Mobile Header */}
-          <div className="md:hidden mb-6 sticky top-0 bg-[#020617]/80 backdrop-blur-2xl z-30 py-4 pt-safe -mx-6 px-6 border-b border-white/5">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 bg-gradient-to-tr from-emerald-400 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
-                  <Wallet size={18} className="text-white" />
+        <main className="flex-1 md:ml-72 pb-20 md:p-8 md:pb-12 overflow-y-auto min-h-screen relative bg-zinc-950">
+          
+          {/* Mobile Header - compact single row */}
+          <div className="md:hidden sticky top-0 bg-zinc-950 border-b border-white/5 z-30">
+            <div className="flex items-center justify-between gap-3 px-4 h-14">
+              {/* Logo + Título da View */}
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 bg-zinc-900 border border-white/10 rounded-lg flex items-center justify-center shrink-0">
+                  <Wallet size={16} className="text-emerald-500" />
                 </div>
-                <div className="min-w-0">
-                  <p className="text-[10px] font-black uppercase tracking-[0.25em] text-emerald-400/80">Fluxo mobile</p>
-                  <h1 className="text-lg font-black tracking-tight text-white truncate">{activeNavItem.label}</h1>
-                </div>
+                <h1 className="text-base font-bold tracking-tight text-zinc-100 truncate">{activeNavItem.label}</h1>
               </div>
 
-              <button
-                onClick={() => { setTransactionToEdit(null); setShowQuickAdd(true); }}
-                className="h-11 w-11 shrink-0 rounded-2xl bg-emerald-500 text-white shadow-[0_10px_30px_rgba(16,185,129,0.25)] flex items-center justify-center active:scale-95 transition-all"
-                title="Registrar"
-              >
-                <Plus size={22} className="stroke-[3]" />
-              </button>
-            </div>
-
-            <div className="mt-4 flex items-start justify-between gap-4">
-              <p className="text-sm leading-relaxed text-slate-400 max-w-[16rem]">
-                {mobileViewDescription}
-              </p>
-
+              {/* Ações rápidas */}
               <div className="flex items-center gap-2 shrink-0">
                 <button
                   onClick={() => setPrivacyMode(!privacyMode)}
-                  className={`h-10 w-10 rounded-2xl border transition-all flex items-center justify-center ${privacyMode
-                    ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
-                    : 'border-white/5 bg-white/5 text-slate-300'
-                    }`}
+                  className={`h-9 w-9 rounded-xl border transition-colors flex items-center justify-center ${
+                    privacyMode
+                      ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
+                      : 'border-white/5 bg-zinc-900 text-zinc-400'
+                  }`}
                   title={privacyMode ? 'Mostrar valores' : 'Ocultar valores'}
                 >
-                  {privacyMode ? <EyeOff size={18} /> : <Eye size={18} />}
+                  {privacyMode ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
 
                 <button
                   onClick={logout}
-                  className="h-10 w-10 rounded-2xl bg-white/5 text-rose-400 border border-white/5 hover:bg-white/10 active:scale-90 transition-all flex items-center justify-center"
+                  className="h-9 w-9 rounded-xl bg-zinc-900 border border-white/5 text-zinc-400 flex items-center justify-center"
                   title="Sair"
                 >
-                  <LogOut size={18} />
+                  <LogOut size={16} />
+                </button>
+
+                <button
+                  onClick={() => { setTransactionToEdit(null); setShowQuickAdd(true); }}
+                  className="h-9 px-3 rounded-xl bg-emerald-500 text-zinc-950 flex items-center justify-center gap-1.5 font-bold text-sm active:scale-95 transition-transform"
+                  title="Registrar"
+                >
+                  <Plus size={16} className="stroke-[2.5]" />
+                  <span>Novo</span>
                 </button>
               </div>
             </div>
 
             {deferredPrompt && (
-              <button
-                onClick={handleInstallClick}
-                className="mt-4 w-full flex items-center justify-center gap-2 rounded-2xl border border-emerald-500/15 bg-emerald-500/[0.08] px-4 py-3 text-[11px] font-black uppercase tracking-[0.22em] text-emerald-300"
-              >
-                <Download size={16} />
-                Instalar app no celular
-              </button>
+              <div className="px-4 pb-2">
+                <button
+                  onClick={handleInstallClick}
+                  className="w-full flex items-center justify-center gap-2 rounded-xl border border-emerald-500/15 bg-emerald-500/[0.06] px-4 py-2.5 text-[11px] font-bold text-emerald-400"
+                >
+                  <Download size={14} />
+                  Instalar App
+                </button>
+              </div>
             )}
           </div>
 
-          <div className="max-w-6xl mx-auto relative z-10">
+          <div className="max-w-6xl mx-auto relative z-10 px-4 md:px-0 pt-4 md:pt-0">
             {currentView === View.DASHBOARD && (
               <Dashboard
                 transactions={filteredTransactions}
@@ -637,14 +632,7 @@ const App: React.FC = () => {
                 privacyMode={privacyMode}
               />
             )}
-            {currentView === View.SIMULATION && (
-              <CashFlowSimulation
-                transactions={allTransactions}
-                accounts={accounts}
-                onStatusToggle={handleToggleStatus}
-                privacyMode={privacyMode}
-              />
-            )}
+
             {currentView === View.CALENDAR && (
               <CalendarView
                 transactions={filteredTransactions}
@@ -676,45 +664,27 @@ const App: React.FC = () => {
           </div>
         </main>
 
-        {/* Mobile Navigation */}
-        <div className="md:hidden fixed left-3 right-3 bottom-3 z-40 flex items-center gap-1 rounded-[2rem] border border-white/10 bg-slate-950/90 px-2 py-2 backdrop-blur-2xl shadow-[0_20px_60px_rgba(0,0,0,0.45)] pb-safe">
-          {navItems.map((item) => (
-            <button
-              key={item.view}
-              onClick={() => setCurrentView(item.view)}
-              className={`flex min-w-0 flex-1 items-center justify-center gap-2 rounded-[1.25rem] px-2 py-3 transition-all ${currentView === item.view
-                ? 'bg-emerald-500/12 text-emerald-300'
-                : 'text-slate-500'
-                }`}
-            >
-              <div className={`rounded-xl p-1.5 transition-all ${currentView === item.view ? 'bg-emerald-500/10 text-emerald-300' : ''}`}>
-                <item.icon size={22} strokeWidth={currentView === item.view ? 2.5 : 2} />
-              </div>
-              <span className={`hidden text-[10px] font-black uppercase tracking-[0.18em] ${currentView === item.view ? 'sm:inline' : ''}`}>{item.label}</span>
-            </button>
-          ))}
+        {/* Mobile Navigation (Fixed block format) */}
+        <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-zinc-950 border-t border-zinc-800 pb-safe">
+          <div className="flex items-center justify-around pt-2 pb-1">
+            {navItems.slice(0, 5).map((item) => (
+              <button
+                key={item.view}
+                onClick={() => setCurrentView(item.view)}
+                className={`flex flex-col items-center justify-center gap-1 flex-1 h-12 transition-colors ${currentView === item.view
+                  ? 'text-emerald-500'
+                  : 'text-zinc-500'
+                  }`}
+              >
+                <item.icon size={20} strokeWidth={currentView === item.view ? 2.5 : 2} />
+                <span className="text-[10px] font-medium">{item.label}</span>
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Mobile Privacy Dock */}
-        <button
-          onClick={() => setPrivacyMode(!privacyMode)}
-          className={`md:hidden fixed bottom-28 left-4 z-40 h-12 w-12 rounded-2xl border shadow-[0_12px_30px_rgba(0,0,0,0.25)] transition-all flex items-center justify-center ${privacyMode
-            ? 'border-emerald-500/30 bg-emerald-500/12 text-emerald-300'
-            : 'border-white/10 bg-slate-900/85 text-slate-300'
-            }`}
-          title={privacyMode ? 'Mostrar valores' : 'Ocultar valores'}
-        >
-          {privacyMode ? <EyeOff size={18} /> : <Eye size={18} />}
-        </button>
 
-        {/* Mobile FAB */}
-        <button
-          onClick={() => { setTransactionToEdit(null); setShowQuickAdd(true); }}
-          className="md:hidden fixed bottom-28 right-4 w-16 h-16 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-[1.75rem] shadow-[0_18px_40px_rgba(16,185,129,0.35)] flex items-center justify-center text-white z-40 active:scale-90 transition-all duration-300"
-          title="Registrar"
-        >
-          <Plus size={28} className="stroke-[3]" />
-        </button>
+
 
         {/* Modals */}
         {showQuickAdd && (

@@ -76,6 +76,5 @@ export enum View {
   REPORTS = 'reports',
   INSIGHTS = 'insights',
   SHOPPING_LIST = 'shopping_list',
-  CALENDAR = 'calendar',
-  SIMULATION = 'simulation'
+  CALENDAR = 'calendar'
 }
