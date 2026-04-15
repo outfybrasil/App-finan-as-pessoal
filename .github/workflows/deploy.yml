@@ -31,20 +31,13 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Build
+      - name: Create .env file from secret
         run: |
-          echo "Verificando chaves de ambiente..."
-          if [ -z "$VITE_APPWRITE_PROJECT_ID" ]; then echo "❌ ERRO: VITE_APPWRITE_PROJECT_ID continua vazio!"; else echo "✅ Chaves carregadas com sucesso."; fi
-          npm run build
-        env:
-          VITE_APPWRITE_ENDPOINT: ${{ secrets.VITE_APPWRITE_ENDPOINT || secrets.APPWRITE_ENDPOINT || secrets.ENDPOINT || 'https://cloud.appwrite.io/v1' }}
-          VITE_APPWRITE_PROJECT_ID: ${{ secrets.VITE_APPWRITE_PROJECT_ID || secrets.APPWRITE_PROJECT_ID || secrets.PROJECT_ID }}
-          VITE_APPWRITE_DATABASE_ID: ${{ secrets.VITE_APPWRITE_DATABASE_ID || secrets.APPWRITE_DATABASE_ID || secrets.DATABASE_ID }}
-          VITE_APPWRITE_TRANSACTIONS_COLLECTION_ID: ${{ secrets.VITE_APPWRITE_TRANSACTIONS_COLLECTION_ID || secrets.TRANSACTIONS_COLLECTION_ID }}
-          VITE_APPWRITE_ACCOUNTS_COLLECTION_ID: ${{ secrets.VITE_APPWRITE_ACCOUNTS_COLLECTION_ID || secrets.ACCOUNTS_COLLECTION_ID }}
-          VITE_APPWRITE_BUDGETS_COLLECTION_ID: ${{ secrets.VITE_APPWRITE_BUDGETS_COLLECTION_ID || secrets.BUDGETS_COLLECTION_ID }}
-          VITE_APPWRITE_GOALS_COLLECTION_ID: ${{ secrets.VITE_APPWRITE_GOALS_COLLECTION_ID || secrets.GOALS_COLLECTION_ID }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || secrets.VITE_GEMINI_API_KEY || secrets.API_KEY }}
+          echo "${{ secrets.ENV }}" > .env
+          echo "✅ Arquivo .env criado com sucesso para o build."
+
+      - name: Build
+        run: npm run build
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
