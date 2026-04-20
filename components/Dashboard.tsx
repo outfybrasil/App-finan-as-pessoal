@@ -152,16 +152,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
     return { name: acc, balance: income - expense };
   }).sort((a, b) => b.balance - a.balance);
 
-  // Saldo Real Acumulado (Total de todas as contas até hoje)
-  const totalRealBalance = allTransactions
-    .filter(checkPaid)
-    .reduce((acc, t) => {
-      const val = Number(t.amount);
-      return t.type === 'income' ? acc + val : acc - val;
-    }, 0);
 
-  // Projeção Final (Saldo Hoje + Pendentes do Mês)
-  const finalMonthProjection = totalRealBalance + (pendingIncome - pendingExpense);
+
+  // Projeção Final (Fluxo Previsto do Mês = Realizado + Pendente)
+  const finalMonthProjection = projectedBalance;
 
   const totalMonthlyFlow = monthlyBalance;
 
@@ -356,9 +350,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 </div>
               </div>
 
-              <div className={`${isSummaryCollapsed ? 'hidden md:flex' : 'flex'} mt-8 pt-6 border-t border-white/5 items-start justify-between gap-4 transition-all duration-300`}>
-                <div>
-                  <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.15em] mb-2">
+              <div className={`${isSummaryCollapsed ? 'hidden md:flex' : 'flex'} mt-8 pt-6 border-t border-white/5 items-start justify-center transition-all duration-300`}>
+                <div className="flex flex-col items-center">
+                  <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.15em] mb-2 text-center">
                     Projeção Final
                   </p>
                   <div className={`flex items-center gap-2 ${privacyClass}`}>
@@ -366,14 +360,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       R$ {finalMonthProjection.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
-                </div>
-                <div className="text-right shrink-0">
-                  <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.15em] mb-2">
-                    Patrimônio Hoje
-                  </p>
-                  <p className={`text-base md:text-lg font-bold text-slate-200 ${privacyClass}`}>
-                    R$ {totalRealBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </p>
                 </div>
               </div>
 

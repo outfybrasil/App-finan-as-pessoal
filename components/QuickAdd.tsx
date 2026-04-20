@@ -109,13 +109,7 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
       setDescription(rawDesc);
       setIsSeries(detectedSeries);
 
-      if (initialData.tags) {
-        const reserveTag = initialData.tags.find(t => t.startsWith('#reserva:'));
-        if (reserveTag) {
-          setEnvelope(reserveTag.replace('#reserva:', ''));
-          setUseEnvelope(true);
-        }
-      }
+
 
       if (initialData.splits && initialData.splits.length > 0) {
         setIsSplitMode(true);
