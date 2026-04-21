@@ -189,6 +189,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ onFinishShopping }) 
                       setShowSuggestions(true);
                     }}
                     onFocus={() => setShowSuggestions(true)}
+                    onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
                     placeholder="Ex: Café em pó"
                     className="w-full bg-slate-950/50 border border-white/5 rounded-3xl px-6 py-5 text-white font-bold placeholder:text-slate-700 outline-none focus:border-emerald-500/50 focus:bg-slate-950 transition-all text-lg shadow-inner"
                   />
@@ -196,10 +197,10 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ onFinishShopping }) 
                 </div>
                 
                 {/* Suggestions Dropdown */}
-                {showSuggestions && newItemName && Object.keys(productCatalog).filter(k => k.toLowerCase().includes(newItemName.toLowerCase())).length > 0 && (
+                {showSuggestions && Object.keys(productCatalog).filter(k => k.toLowerCase().includes((newItemName || '').toLowerCase())).length > 0 && (
                   <div className="absolute z-50 left-0 right-0 top-[calc(100%+0.5rem)] bg-slate-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden max-h-48 overflow-y-auto custom-scrollbar">
                     {Object.keys(productCatalog)
-                      .filter(k => k.toLowerCase().includes(newItemName.toLowerCase()))
+                      .filter(k => k.toLowerCase().includes((newItemName || '').toLowerCase()))
                       .map(name => (
                         <div 
                           key={name}
