@@ -10,9 +10,11 @@ import { CalendarView } from './components/CalendarView';
 import { Auth } from './components/Auth';
 import { useAuth } from './hooks/useAuth';
 import { useFinance } from './hooks/useFinance';
-import { TravelProvider } from './context/TravelContext';
 import { TravelModeSettings } from './components/TravelMode';
-import { PiggyBank } from 'lucide-react';
+import { CategorySettings } from './components/CategorySettings';
+import { TravelProvider } from './context/TravelContext';
+import { CategoryProvider } from './context/CategoryContext';
+import { PiggyBank, Settings } from 'lucide-react';
 
 import { DeleteSeriesModal } from './components/DeleteSeriesModal';
 import { CustomDialog } from './components/CustomDialog';
@@ -38,7 +40,8 @@ const App: React.FC = () => {
     addAccount: addAccountService,
     updateAccount: updateAccountService,
     deleteAccount: deleteAccountService,
-    deleteMultipleTransactions
+    deleteMultipleTransactions,
+    recategorizeTransactions
   } = useFinance(user?.$id);
 
   const [currentView, setCurrentView] = useState<View>(View.DASHBOARD);
@@ -443,6 +446,7 @@ const App: React.FC = () => {
     { view: View.BUDGETS, label: 'Planejamento', icon: PieChart },
     { view: View.SHOPPING_LIST, label: 'Lista', icon: ShoppingCart },
     { view: View.REPORTS, label: 'Relatórios', icon: BarChart3 },
+    { view: View.SETTINGS, label: 'Ajustes', icon: Settings },
   ];
 
   const activeNavItem = navItems.find((item) => item.view === currentView) ?? navItems[0];
@@ -480,9 +484,10 @@ const App: React.FC = () => {
     );
   }
   return (
-    <TravelProvider>
+    <CategoryProvider>
+      <TravelProvider>
   
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col md:flex-row font-sans overflow-x-hidden">
+        <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col md:flex-row font-sans overflow-x-hidden">
 
         {/* Desktop Sidebar */}
         <aside className="hidden md:flex flex-col w-72 border-r border-white/5 bg-zinc-950 p-6 fixed h-full z-20">
@@ -661,13 +666,25 @@ const App: React.FC = () => {
               />
             )}
             {currentView === View.REPORTS && <Reports transactions={allTransactions} />}
+            {currentView === View.SETTINGS && (
+              <CategorySettings 
+                transactions={allTransactions} 
+                onRecategorizeCategory={async (oldCat, type, newCat) => {
+                  const success = await recategorizeTransactions(oldCat, type, newCat);
+                  if (!success) {
+                    setGlobalAlert({ show: true, message: "Erro ao recategorizar transações da categoria apagada." });
+                  }
+                  return success;
+                }}
+              />
+            )}
           </div>
         </main>
 
         {/* Mobile Navigation (Fixed block format) */}
         <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-zinc-950 border-t border-zinc-800 pb-safe">
-          <div className="flex items-center justify-around pt-2 pb-1">
-            {navItems.slice(0, 5).map((item) => (
+          <div className="flex items-center justify-around pt-2 pb-1 overflow-x-auto no-scrollbar">
+            {navItems.map((item) => (
               <button
                 key={item.view}
                 onClick={() => setCurrentView(item.view)}
@@ -694,6 +711,14 @@ const App: React.FC = () => {
             onEdit={handleEditTransaction}
             onDelete={handleDeleteTransaction}
             initialData={transactionToEdit}
+            allTransactions={allTransactions}
+            onRecategorizeCategory={async (oldCat, type, newCat) => {
+              const success = await recategorizeTransactions(oldCat, type, newCat);
+              if (!success) {
+                setGlobalAlert({ show: true, message: "Erro ao recategorizar transações da categoria apagada." });
+              }
+              return success;
+            }}
           />
         )}
 
@@ -722,7 +747,8 @@ const App: React.FC = () => {
         onConfirm={handleConfirmSingleDelete}
         onCancel={() => setShowSingleDeleteConfirm(false)}
       />
-    </TravelProvider>
+      </TravelProvider>
+    </CategoryProvider>
   );
 };
 

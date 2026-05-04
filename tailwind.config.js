@@ -9,6 +9,7 @@ export default {
     ],
     theme: {
         extend: {
+            /* ── Existing semantic tokens (keeps backward compat) ── */
             colors: {
                 border: "hsl(var(--border))",
                 input: "hsl(var(--input))",
@@ -43,11 +44,47 @@ export default {
                     DEFAULT: "hsl(var(--card))",
                     foreground: "hsl(var(--card-foreground))",
                 },
+
+                /* ── Monolith Slate explicit tokens ── */
+                ms: {
+                    base:      '#0e0e10',  /* The Void */
+                    low:       '#131316',  /* surface-container-low */
+                    container: '#19191d',  /* surface-container */
+                    high:      '#1f1f24',  /* surface-container-high */
+                    highest:   '#25252b',  /* surface-container-highest */
+                    primary:   '#4edea3',  /* Income / CTA */
+                    'on-primary': '#004a31',
+                    secondary: '#ff6f7e',  /* Expense */
+                    tertiary:  '#ffb148',  /* Warning / Pending */
+                    on:        '#e7e4ec',  /* on-surface */
+                    muted:     '#acaab1',  /* on-surface-variant */
+                    outline:   '#47474e',  /* outline-variant */
+                },
             },
+
+            /* ── Border radius: 4px base (Monolith sharpness) ── */
             borderRadius: {
-                lg: "var(--radius)",
-                md: "calc(var(--radius) - 2px)",
-                sm: "calc(var(--radius) - 4px)",
+                DEFAULT: '4px',
+                sm:  '2px',
+                md:  '4px',
+                lg:  '8px',
+                xl:  '8px',
+                '2xl': '8px',
+                '3xl': '8px',
+                full: '9999px',
+            },
+
+            /* ── Font families ── */
+            fontFamily: {
+                sans:    ['Inter', 'system-ui', 'sans-serif'],
+                manrope: ['Manrope', 'Inter', 'sans-serif'],
+                inter:   ['Inter', 'system-ui', 'sans-serif'],
+            },
+
+            /* ── Spacing — 8px grid ── */
+            spacing: {
+                '18': '4.5rem',
+                '22': '5.5rem',
             },
         },
     },

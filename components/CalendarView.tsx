@@ -78,35 +78,35 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       {/* Header */}
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 shrink-0">
         <div>
-          <h1 className="text-4xl font-black text-white tracking-tight flex items-center gap-4">
-            <div className="p-3 bg-emerald-500/10 rounded-2xl border border-emerald-500/20 text-emerald-400">
-              <CalendarIcon size={32} />
+          <h1 className="text-3xl md:text-4xl font-black font-manrope tracking-tight flex items-center gap-3" style={{color:'#e7e4ec'}}>
+            <div className="p-2.5" style={{backgroundColor:'rgba(78,222,163,0.08)',borderRadius:'4px'}}>
+              <CalendarIcon size={28} style={{color:'#4edea3'}} />
             </div>
             Calendário
           </h1>
-          <p className="text-slate-500 font-bold mt-2 ml-16">Histórico visual das suas movimentações</p>
+          <p className="text-ms-muted font-medium mt-2 ml-14">Histórico visual das suas movimentações</p>
         </div>
-        
-        <div className="flex items-center glass p-1.5 rounded-2xl border-white/5 shadow-xl">
-          <button onClick={prevMonth} className="p-3 hover:bg-white/5 rounded-xl text-slate-400 hover:text-white transition-all active:scale-90">
-            <ChevronLeft size={24} />
+
+        <div className="flex items-center p-1" style={{backgroundColor:'#19191d',borderRadius:'4px'}}>
+          <button onClick={prevMonth} className="p-3 text-ms-muted hover:text-ms-on transition-colors" style={{borderRadius:'4px'}}>
+            <ChevronLeft size={22} />
           </button>
-          <div className="px-8 flex items-center gap-3 font-black text-xl text-white min-w-[180px] justify-center capitalize tracking-tighter">
+          <div className="px-6 flex items-center font-black text-lg font-manrope min-w-[160px] justify-center capitalize" style={{color:'#e7e4ec'}}>
             {formatMonth(currentMonth)}
           </div>
-          <button onClick={nextMonth} className="p-3 hover:bg-white/5 rounded-xl text-slate-400 hover:text-white transition-all active:scale-90">
-            <ChevronRight size={24} />
+          <button onClick={nextMonth} className="p-3 text-ms-muted hover:text-ms-on transition-colors" style={{borderRadius:'4px'}}>
+            <ChevronRight size={22} />
           </button>
         </div>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 flex-1 min-h-0">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-0">
         {/* Calendar Grid */}
-        <div className="lg:col-span-2 glass-card rounded-[2.5rem] border-white/10 p-6 sm:p-8 flex flex-col shadow-2xl overflow-hidden min-h-[500px]">
+        <div className="lg:col-span-2 p-6 sm:p-8 flex flex-col overflow-hidden min-h-[480px]" style={{backgroundColor:'#19191d',borderRadius:'4px'}}>
            {/* Weekday Headers */}
-           <div className="grid grid-cols-7 mb-8">
+           <div className="grid grid-cols-7 mb-6">
               {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((day, i) => (
-                 <div key={i} className={`text-center text-[10px] font-black uppercase tracking-[0.2em] ${i === 0 || i === 6 ? 'text-slate-600' : 'text-slate-500'}`}>
+                 <div key={i} className={`text-center text-[10px] font-black uppercase tracking-[0.2em] ${i === 0 || i === 6 ? 'text-ms-muted opacity-40' : 'text-ms-muted'}`}>
                     {day}
                  </div>
               ))}
@@ -163,7 +163,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         </div>
 
         {/* Selected Date Details */}
-        <div className="glass-card rounded-[2.5rem] border-white/10 p-8 flex flex-col max-h-[700px] lg:max-h-none overflow-hidden shadow-2xl">
+        <div className="p-6 flex flex-col max-h-[700px] lg:max-h-none overflow-hidden" style={{backgroundColor:'#19191d',borderRadius:'4px'}}>
              <div className="mb-8 pb-6 border-b border-white/5 bg-transparent">
                 <div className="flex items-center justify-between mb-4">
                   <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Detalhes do Dia</p>

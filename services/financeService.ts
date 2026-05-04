@@ -160,6 +160,30 @@ export const financeService = {
     }
   },
 
+  async updateMultipleTransactions(ids: string[], updates: Partial<Transaction>): Promise<boolean> {
+    try {
+      const payload: Record<string, any> = {};
+      if (updates.category !== undefined) payload.category = updates.category;
+      if (updates.type !== undefined) payload.type = updates.type;
+      if (updates.isPaid !== undefined) payload.is_paid = updates.isPaid;
+      if (updates.account !== undefined) payload.account = updates.account;
+
+      const promises = ids.map(id =>
+        databases.updateDocument(
+          APPWRITE_DATABASE_ID,
+          TRANSACTIONS_COLLECTION_ID,
+          id,
+          payload
+        )
+      );
+      await Promise.all(promises);
+      return true;
+    } catch (error) {
+      console.error('Error updating multiple transactions:', error);
+      return false;
+    }
+  },
+
   async getBudgets(): Promise<Budget[]> {
     try {
       const { documents } = await databases.listDocuments(

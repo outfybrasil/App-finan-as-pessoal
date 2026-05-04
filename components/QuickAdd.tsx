@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useTravelMode } from '../context/TravelContext';
 import { Transaction, TransactionType } from '../types';
 import { TrendingUp, TrendingDown, FileText, X, CalendarClock, Trash2, Layers, Info, CheckCircle2, Clock, CreditCard, Plus, Minus, Calculator, ChevronRight, ArrowDownCircle, ArrowUpCircle, PiggyBank, Save } from 'lucide-react';
 import { CustomDialog } from './CustomDialog';
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, ACCOUNT_OPTIONS } from '../constants/categories';
+import { useCategories } from '../context/CategoryContext';
 
 interface QuickAddProps {
   onAdd: (
@@ -23,6 +24,8 @@ interface QuickAddProps {
   onDelete?: (transaction: Transaction) => void;
   onClose: () => void;
   initialData?: Transaction | null;
+  allTransactions?: Transaction[];
+  onRecategorizeCategory?: (oldCategory: string, type: TransactionType, newCategory: string) => Promise<boolean>;
 }
 
 export const QuickAdd: React.FC<QuickAddProps> = ({
@@ -30,7 +33,9 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
   onEdit,
   onDelete,
   onClose,
-  initialData
+  initialData,
+  allTransactions = [],
+  onRecategorizeCategory
 }) => {
   const isEditing = !!(initialData && initialData.id && initialData.id !== 'new_transfer');
 
@@ -61,9 +66,13 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
   const [destinationAccount, setDestinationAccount] = useState('Itaú');
 
   const { isTravelModeActive, travelEventName } = useTravelMode();
+  const { hiddenCategories, customCategories, addCustomCategory, hideCategory, removeCustomCategory } = useCategories();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showAlertDialog, setShowAlertDialog] = useState(false);
   const [alertMessage, setAlertMessage] = useState('');
+  const [showCustomCategoryInput, setShowCustomCategoryInput] = useState(false);
+  const [showDeleteCategoryConfirm, setShowDeleteCategoryConfirm] = useState(false);
+  const [categoryToDelete, setCategoryToDelete] = useState('');
 
   useEffect(() => {
     if (isTravelModeActive && !initialData && !isEditing) {
@@ -71,6 +80,30 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
       setDescription(travelEventName);
     }
   }, [isTravelModeActive, travelEventName, initialData, isEditing]);
+
+  // Dynamic categories logic
+  const { defaultCategories, userCategories, dynamicCategories, rawDefaults } = useMemo(() => {
+    const defaults = type === 'expense' ? EXPENSE_CATEGORIES : INCOME_CATEGORIES;
+    
+    // Extract unique categories from existing transactions of the same type
+    const transactionCategories = allTransactions
+      .filter(t => t.type === type && !defaults.includes(t.category))
+      .map(t => t.category);
+    
+    // Combine with custom categories from context
+    const allCustoms = Array.from(new Set([...transactionCategories, ...customCategories]))
+      .filter(cat => cat && !defaults.includes(cat));
+    
+    // Filter out hidden categories from defaults
+    const activeDefaults = defaults.filter(cat => !hiddenCategories.includes(cat));
+    
+    const all = [...activeDefaults, ...allCustoms].sort((a, b) => a.localeCompare(b));
+    return { defaultCategories: activeDefaults, userCategories: allCustoms, dynamicCategories: all, rawDefaults: defaults };
+  }, [allTransactions, type, customCategories, hiddenCategories]);
+
+  const isUserDefinedCategory = userCategories.includes(category);
+  const isDefaultCategory = rawDefaults.includes(category);
+  const canDeleteCurrentCategory = (isUserDefinedCategory || isDefaultCategory) && category !== 'Outros' && !showCustomCategoryInput;
 
   useEffect(() => {
     if (initialData) {
@@ -112,8 +145,7 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
       if (initialData.tags) {
         const reserveTag = initialData.tags.find(t => t.startsWith('#reserva:'));
         if (reserveTag) {
-          setEnvelope(reserveTag.replace('#reserva:', ''));
-          setUseEnvelope(true);
+          // Reserve logic could go here if needed
         }
       }
 
@@ -128,8 +160,16 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
       if (initialData.destinationAccount) {
         setDestinationAccount(initialData.destinationAccount);
       }
+
+      // Check if category is known (either default or already used in other transactions)
+      const isKnownCategory = dynamicCategories.includes(initialData.category);
+      if (initialData.category && !isKnownCategory) {
+        setShowCustomCategoryInput(true);
+      } else {
+        setShowCustomCategoryInput(false);
+      }
     }
-  }, [initialData, isEditing]);
+  }, [initialData, isEditing, dynamicCategories]);
 
   useEffect(() => {
     if (!initialData) {
@@ -198,6 +238,10 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
         payload.tags
       );
     }
+    if (showCustomCategoryInput && category.trim()) {
+      addCustomCategory(category.trim());
+    }
+
     onClose();
   };
 
@@ -249,62 +293,88 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
     }
   };
 
+  const handleConfirmDeleteCategory = async () => {
+    if (categoryToDelete) {
+      // Logic from CategorySettings: move transactions to 'Outros' if they exist
+      const success = onRecategorizeCategory ? await onRecategorizeCategory(categoryToDelete, type, 'Outros') : true;
+      
+      if (success) {
+        if (rawDefaults.includes(categoryToDelete)) {
+          hideCategory(categoryToDelete);
+        } else {
+          removeCustomCategory(categoryToDelete);
+        }
+        
+        setCategory('');
+        setShowCustomCategoryInput(false);
+      }
+      
+      setShowDeleteCategoryConfirm(false);
+      setCategoryToDelete('');
+    }
+  };
+
   const installmentValue = (parseFloat(amount || '0') / (installments || 1));
 
   return (
     <>
-      <div className="fixed inset-0 bg-zinc-950/80 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4 animate-in fade-in duration-300">
-        <div className="bg-zinc-950 border-t md:border border-white/5 rounded-t-3xl md:rounded-2xl w-full max-w-lg overflow-hidden animate-in slide-in-from-bottom-6 md:zoom-in-95 duration-300 flex flex-col max-h-[92dvh] md:max-h-[90vh] shadow-2xl shadow-black/50">
+      <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4 animate-in fade-in duration-300" style={{backgroundColor:'rgba(14,14,16,0.85)'}}>
+        <div className="w-full max-w-lg overflow-hidden animate-in slide-in-from-bottom-6 md:zoom-in-95 duration-300 flex flex-col max-h-[92dvh] md:max-h-[90vh]" style={{backgroundColor:'#0e0e10',borderTopLeftRadius:'8px',borderTopRightRadius:'8px'}}>
+          {/* Mobile drag handle */}
           <div className="flex justify-center pt-3 md:hidden">
-            <div className="h-1 w-12 rounded-full bg-zinc-800" />
+            <div className="h-1 w-10" style={{backgroundColor:'#25252b'}} />
           </div>
 
-          <div className="flex justify-between items-center p-6 md:p-8 border-b border-white/5 shrink-0 bg-zinc-900/50">
+          <div className="flex justify-between items-center p-6 md:p-8 shrink-0" style={{backgroundColor:'#19191d',borderBottom:'1px solid rgba(71,71,78,0.15)'}}>
             <div>
-              <h2 className="text-xl md:text-2xl font-black text-white tracking-tight">
+              <h2 className="text-xl md:text-2xl font-black font-manrope" style={{color:'#e7e4ec'}}>
                 {isEditing ? 'Editar Registro' : 'Novo Registro'}
               </h2>
-              <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mt-1">Sincronizado via Appwrite</p>
+              <p className="text-[10px] font-black text-ms-muted uppercase tracking-[0.2em] mt-1">Sincronizado via Appwrite</p>
             </div>
-            <button onClick={onClose} className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-all border border-white/5">
+            <button onClick={onClose} className="w-10 h-10 flex items-center justify-center text-ms-muted hover:text-ms-on transition-colors" style={{backgroundColor:'#25252b',borderRadius:'4px'}}>
               <X size={20} />
             </button>
           </div>
 
           <form onSubmit={handleSubmit} className="p-5 md:p-8 space-y-6 md:space-y-8 overflow-y-auto custom-scrollbar">
             {/* Type Selector */}
-            <div className="flex gap-4 p-1.5 bg-zinc-900 border border-white/5 rounded-2xl">
+            <div className="flex gap-2 p-1.5" style={{backgroundColor:'#19191d',borderRadius:'4px'}}>
               <button
                 type="button"
                 onClick={() => setType('expense')}
-                className={`flex-1 flex items-center justify-center gap-3 py-4 rounded-xl border transition-all duration-500 ${type === 'expense'
-                  ? 'bg-rose-500 text-white border-rose-500 shadow-xl shadow-rose-500/20'
-                  : 'bg-transparent border-transparent text-slate-500 hover:text-slate-300'
-                  }`}
+                className="flex-1 flex items-center justify-center gap-3 py-4 border-0 transition-all duration-300"
+                style={{
+                  borderRadius:'4px',
+                  backgroundColor: type === 'expense' ? '#ff6f7e' : 'transparent',
+                  color: type === 'expense' ? '#0e0e10' : '#acaab1'
+                }}
               >
-                <ArrowDownCircle size={20} className={type === 'expense' ? 'animate-bounce' : ''} />
+                <ArrowDownCircle size={18} />
                 <span className="font-black text-xs uppercase tracking-widest">Despesa</span>
               </button>
               <button
                 type="button"
                 onClick={() => setType('income')}
-                className={`flex-1 flex items-center justify-center gap-3 py-4 rounded-xl border transition-all duration-500 ${type === 'income'
-                  ? 'bg-emerald-500 text-white border-emerald-500 shadow-xl shadow-emerald-500/20'
-                  : 'bg-transparent border-transparent text-slate-500 hover:text-slate-300'
-                  }`}
+                className="flex-1 flex items-center justify-center gap-3 py-4 border-0 transition-all duration-300"
+                style={{
+                  borderRadius:'4px',
+                  backgroundColor: type === 'income' ? '#4edea3' : 'transparent',
+                  color: type === 'income' ? '#004a31' : '#acaab1'
+                }}
               >
-                <ArrowUpCircle size={20} className={type === 'income' ? 'animate-bounce' : ''} />
+                <ArrowUpCircle size={18} />
                 <span className="font-black text-xs uppercase tracking-widest">Receita</span>
               </button>
             </div>
 
             {/* Amount Input */}
             <div className="relative group">
-              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3 ml-1">
+              <label className="block text-[10px] font-black text-ms-muted uppercase tracking-widest mb-3 ml-1">
                 {isInstallmentMode && !isEditing ? 'Valor Total da Compra' : 'Valor do Lançamento'}
               </label>
               <div className="relative">
-                <span className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-500 text-xl font-black">R$</span>
+                <span className="absolute left-5 top-1/2 -translate-y-1/2 font-black text-lg" style={{color:'#acaab1'}}>R$</span>
                 <input
                   type="number"
                   step="0.01"
@@ -312,12 +382,20 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
                   onChange={(e) => setAmount(parseFloat(e.target.value) || 0)}
                   placeholder="0,00"
                   autoFocus
-                  className="w-full bg-zinc-900 border border-white/5 rounded-xl px-6 py-6 pl-14 text-4xl font-black text-zinc-100 outline-none focus:border-zinc-700 transition-all font-sans tracking-tighter"
+                  className="w-full px-6 py-5 pl-14 text-4xl font-black font-manrope tnum outline-none transition-all"
+                  style={{
+                    backgroundColor:'#19191d',
+                    border:'1px solid rgba(71,71,78,0.15)',
+                    borderRadius:'4px',
+                    color:'#e7e4ec',
+                    fontVariantNumeric:'tabular-nums',
+                    letterSpacing:'-0.04em'
+                  }}
                 />
               </div>
               {isInstallmentMode && !isEditing && amount && (
-                <div className="absolute right-4 -bottom-6 bg-amber-500/10 border border-amber-500/20 px-3 py-1 rounded-full">
-                  <p className="text-[10px] font-black text-amber-500 uppercase tracking-tighter">
+                <div className="absolute right-4 -bottom-6 px-3 py-1" style={{backgroundColor:'rgba(255,177,72,0.08)',borderRadius:'4px'}}>
+                  <p className="text-[10px] font-black uppercase tracking-tighter tnum" style={{color:'#ffb148'}}>
                     {installments}x de R$ {installmentValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </p>
                 </div>
@@ -343,21 +421,64 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div className="space-y-3">
                 <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Categoria</label>
-                <div className="relative">
-                  <Layers size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600 pointer-events-none" />
-                  <select
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                    className="w-full bg-zinc-900 border border-white/5 rounded-xl px-5 py-4 pl-12 text-zinc-100 font-bold outline-none appearance-none cursor-pointer focus:border-zinc-700 transition-all"
-                    required
-                  >
-                    <option value="" disabled className="bg-zinc-950">Selecione</option>
-                    {(type === 'expense' ? EXPENSE_CATEGORIES : INCOME_CATEGORIES).map(cat => (
-                      <option key={cat} value={cat} className="bg-slate-900">{cat}</option>
-                    ))}
-                  </select>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Layers size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600 pointer-events-none" />
+                    <select
+                      value={showCustomCategoryInput ? 'custom' : category}
+                      onChange={(e) => {
+                        if (e.target.value === 'custom') {
+                          setShowCustomCategoryInput(true);
+                          setCategory('');
+                        } else {
+                          setShowCustomCategoryInput(false);
+                          setCategory(e.target.value);
+                        }
+                      }}
+                      className="w-full bg-zinc-900 border border-white/5 rounded-xl px-5 py-4 pl-12 text-zinc-100 font-bold outline-none appearance-none cursor-pointer focus:border-zinc-700 transition-all"
+                      required
+                    >
+                      <option value="" disabled className="bg-zinc-950">Selecione</option>
+                      {dynamicCategories.map(cat => (
+                        <option key={cat} value={cat} className="bg-slate-900">{cat}</option>
+                      ))}
+                      <option value="custom" className="bg-slate-800 text-emerald-400 font-bold">➕ Nova Categoria...</option>
+                    </select>
+                  </div>
+                  
+                  {canDeleteCurrentCategory && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCategoryToDelete(category);
+                        setShowDeleteCategoryConfirm(true);
+                      }}
+                      className="w-14 h-14 flex items-center justify-center bg-rose-500/10 text-rose-500 border border-rose-500/20 rounded-xl hover:bg-rose-500 hover:text-white transition-all shrink-0"
+                      title="Apagar categoria"
+                    >
+                      <Trash2 size={20} />
+                    </button>
+                  )}
                 </div>
               </div>
+
+              {showCustomCategoryInput && (
+                <div className="space-y-3 animate-in slide-in-from-top-2 duration-200">
+                  <label className="block text-[10px] font-black text-emerald-500 uppercase tracking-widest ml-1">Nome da Nova Categoria</label>
+                  <div className="relative">
+                    <Plus size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-500" />
+                    <input
+                      type="text"
+                      value={category}
+                      onChange={(e) => setCategory(e.target.value)}
+                      placeholder="Ex: Cartão da Mãe"
+                      className="w-full bg-emerald-500/5 border border-emerald-500/20 rounded-xl px-5 py-4 pl-12 text-emerald-50 text-base font-bold placeholder:text-emerald-500/40 outline-none focus:border-emerald-500 transition-all"
+                      required
+                      autoFocus
+                    />
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-3">
                 <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Data</label>
@@ -611,22 +732,24 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
             </div>
 
             {/* Footer Actions */}
-            <div className="sticky bottom-0 -mx-5 md:-mx-8 mt-2 border-t border-white/5 bg-zinc-950 px-5 md:px-8 pt-4 pb-4 pb-safe">
-              <div className="flex gap-4">
+            <div className="sticky bottom-0 -mx-5 md:-mx-8 mt-2 px-5 md:px-8 pt-4 pb-4 pb-safe" style={{borderTop:'1px solid rgba(71,71,78,0.15)',backgroundColor:'#0e0e10'}}>
+              <div className="flex gap-3">
               {isEditing && (
                 <button
                   type="button"
                   onClick={handleDeleteClick}
-                  className="w-14 h-14 shrink-0 rounded-xl bg-transparent border border-rose-500/30 flex items-center justify-center text-rose-500 hover:bg-rose-500 hover:text-white transition-all outline-none"
+                  className="w-14 h-14 shrink-0 flex items-center justify-center transition-all outline-none"
+                  style={{backgroundColor:'transparent',border:'1px solid rgba(255,111,126,0.3)',borderRadius:'4px',color:'#ff6f7e'}}
                 >
-                  <Trash2 size={24} />
+                  <Trash2 size={22} />
                 </button>
               )}
                 <button
                   type="submit"
-                  className="w-full h-14 rounded-xl flex items-center justify-center gap-3 bg-emerald-500 text-zinc-950 font-bold tracking-wide transition-all shadow-md mt-2 md:mt-0 hover:bg-emerald-400 active:scale-95"
+                  className="w-full h-14 flex items-center justify-center gap-3 font-bold tracking-wide transition-all"
+                  style={{backgroundColor:'#4edea3',color:'#004a31',borderRadius:'4px',fontFamily:'Manrope, Inter, sans-serif'}}
                 >
-                  <Save size={20} className="stroke-[2.5]" />
+                  <Save size={20} style={{strokeWidth:2.5}} />
                   {isEditing ? 'Salvar Alterações' : 'Salvar Registro'}
                 </button>
               </div>
@@ -643,6 +766,15 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
         variant="danger"
         onConfirm={handleConfirmDelete}
         onCancel={() => setShowDeleteConfirm(false)}
+      />
+      <CustomDialog
+        isOpen={showDeleteCategoryConfirm}
+        type="confirm"
+        title="Apagar Categoria"
+        message={`Deseja realmente apagar a categoria "${categoryToDelete}"? Todas as transações existentes nesta categoria serão movidas para "Outros".`}
+        variant="danger"
+        onConfirm={handleConfirmDeleteCategory}
+        onCancel={() => setShowDeleteCategoryConfirm(false)}
       />
       {/* Custom Alert Dialog */}
       <CustomDialog

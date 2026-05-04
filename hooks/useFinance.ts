@@ -137,6 +137,23 @@ export const useFinance = (userId: string | undefined) => {
         addAccount,
         updateAccount,
         deleteAccount,
-        deleteMultipleTransactions: financeService.deleteMultipleTransactions
+        deleteAccount,
+        deleteMultipleTransactions: financeService.deleteMultipleTransactions,
+        recategorizeTransactions: async (oldCategory: string, type: TransactionType, newCategory: string) => {
+            const toUpdate = transactions.filter(t => t.category === oldCategory && t.type === type);
+            if (toUpdate.length === 0) return true;
+            
+            const ids = toUpdate.map(t => t.id);
+            const success = await financeService.updateMultipleTransactions(ids, { category: newCategory });
+            
+            if (success) {
+                setTransactions(prev => prev.map(t => 
+                    (t.category === oldCategory && t.type === type) 
+                    ? { ...t, category: newCategory } 
+                    : t
+                ));
+            }
+            return success;
+        }
     };
 };

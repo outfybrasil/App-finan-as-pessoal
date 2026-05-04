@@ -108,3 +108,10 @@ dist
 # OS metadata
 .DS_Store
 Thumbs.db
+
+# Assistant temporary files
+.gemini_*
+resolve.py
+scripts/context/
+scripts/hooks/
+scripts/lib/

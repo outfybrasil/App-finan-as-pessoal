@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Transaction, Budget } from '../types';
 import { Wallet, TrendingUp, TrendingDown, AlertTriangle, ChevronLeft, ChevronRight, Edit2, CheckCircle2, Clock, PiggyBank, CreditCard, X, Save, CalendarRange, Landmark, Plane, PieChart as PieChartIcon, Layers, FileText, MoreVertical, Scale, ArrowRightLeft, Info, HelpCircle } from 'lucide-react';
 import { CustomDialog } from './CustomDialog';
@@ -33,6 +33,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [filterType, setFilterType] = useState<'all' | 'income' | 'expense' | 'pending'>('all');
   const [itemsToShow, setItemsToShow] = useState(10);
   const [isSummaryCollapsed, setIsSummaryCollapsed] = useState(true);
+  const [isGrouped, setIsGrouped] = useState(() => {
+    return localStorage.getItem('dashboard_isGrouped') === 'true';
+  });
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    localStorage.setItem('dashboard_isGrouped', isGrouped.toString());
+  }, [isGrouped]);
+
 
   const { isTravelModeActive, travelEventName } = useTravelMode();
 
@@ -215,6 +224,30 @@ export const Dashboard: React.FC<DashboardProps> = ({
     return a.description.localeCompare(b.description);
   });
 
+  // Lógica de agrupamento
+  const groupedTransactions = sortedTransactions.reduce((acc, t) => {
+    const category = t.category || 'Outros';
+    if (!acc[category]) {
+      acc[category] = [];
+    }
+    acc[category].push(t);
+    return acc;
+  }, {} as Record<string, Transaction[]>);
+
+  const categoryGroups = Object.entries(groupedTransactions).sort((a, b) => {
+    return a[0].localeCompare(b[0]);
+  });
+
+  const toggleCategory = (category: string) => {
+    const newSet = new Set(expandedCategories);
+    if (newSet.has(category)) {
+      newSet.delete(category);
+    } else {
+      newSet.add(category);
+    }
+    setExpandedCategories(newSet);
+  };
+
   const hasMoreItems = sortedTransactions.length > itemsToShow;
   const paginatedTransactions = sortedTransactions.slice(0, itemsToShow);
 
@@ -277,28 +310,28 @@ export const Dashboard: React.FC<DashboardProps> = ({
         {/* Header & Month Selector */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 md:gap-6">
           <div className="w-full md:w-auto">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-slate-300">
-              <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.8)]" />
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-ms-muted" style={{letterSpacing:'0.22em'}}>
+              <span className="h-1.5 w-1.5 bg-ms-primary" />
               Pulso do mês
             </div>
-            <h1 className="mt-3 text-2xl md:text-3xl font-extrabold text-white tracking-tight">Visão Geral</h1>
-            <p className="text-sm md:text-base text-slate-400 mt-1 font-medium max-w-xl">{monthPulseLabel}</p>
+            <h1 className="mt-3 text-2xl md:text-3xl font-extrabold tracking-tight font-manrope" style={{color:'#e7e4ec'}}>Visão Geral</h1>
+            <p className="text-sm text-ms-muted mt-1 font-medium max-w-xl">{monthPulseLabel}</p>
             {isTravelModeActive && (
-              <div className="mt-3 inline-flex items-center gap-2 px-4 py-1.5 bg-indigo-500/10 text-indigo-400 rounded-full border border-indigo-500/20 text-xs font-bold animate-pulse backdrop-blur-md">
+              <div className="mt-3 inline-flex items-center gap-2 px-4 py-1.5 text-ms-tertiary text-xs font-bold" style={{backgroundColor:'rgba(255,177,72,0.08)',borderRadius:'4px'}}>
                 <Plane size={14} />
                 Modo Viagem Ativo: {travelEventName}
               </div>
             )}
           </div>
 
-          <div className="flex w-full md:w-auto items-center justify-between bg-zinc-900 border border-white/5 rounded-xl p-1 shadow-sm">
-            <button onClick={prevMonth} className="p-3 hover:bg-white/10 rounded-xl text-slate-400 hover:text-white transition-all">
+          <div className="flex w-full md:w-auto items-center justify-between p-1" style={{backgroundColor:'#19191d',borderRadius:'4px'}}>
+            <button onClick={prevMonth} className="p-3 text-ms-muted hover:text-ms-on transition-colors" style={{borderRadius:'4px'}}>
               <ChevronLeft size={20} />
             </button>
-            <div className="px-4 md:px-6 flex items-center gap-2 font-bold text-slate-100 min-w-0 flex-1 justify-center text-base md:text-lg text-center">
+            <div className="px-4 md:px-6 flex items-center font-bold min-w-0 flex-1 justify-center text-base md:text-lg font-manrope" style={{color:'#e7e4ec'}}>
               {formatMonth(currentMonth)}
             </div>
-            <button onClick={nextMonth} className="p-3 hover:bg-white/10 rounded-xl text-slate-400 hover:text-white transition-all">
+            <button onClick={nextMonth} className="p-3 text-ms-muted hover:text-ms-on transition-colors" style={{borderRadius:'4px'}}>
               <ChevronRight size={20} />
             </button>
           </div>
@@ -307,81 +340,68 @@ export const Dashboard: React.FC<DashboardProps> = ({
         {/* Hero Section - Cards */}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
 
-          {/* Main Balance Card - MENSAL ISOLADO */}
-          <div className="md:col-span-6 relative overflow-hidden rounded-2xl bg-zinc-900 border border-white/5 shadow-sm group">
-            
-            <div className="absolute top-0 right-0 p-6 md:p-8 opacity-5 transform group-hover:scale-110 transition-transform duration-1000">
-              <Wallet size={160} className="text-white" />
-            </div>
-
-            <div className="relative p-6 md:p-8 h-full flex flex-col justify-between z-10">
+          {/* Main Balance Card — Monolith Slate */}
+          <div className="md:col-span-6 relative overflow-hidden" style={{backgroundColor:'#19191d',borderRadius:'4px'}}>
+            <div className="relative p-6 md:p-8 h-full flex flex-col justify-between">
               <div>
-                <div className="flex items-center gap-2 text-emerald-400/80 mb-3">
-                  <div className="p-2 bg-emerald-500/10 rounded-xl backdrop-blur-md border border-emerald-500/20">
-                    <Wallet size={18} />
-                  </div>
-                  <span className="font-bold text-[11px] uppercase tracking-[0.2em]">Fluxo Líquido Mensal</span>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <h2 className={`text-4xl sm:text-5xl md:text-6xl font-black text-white tracking-tighter mt-2 ${privacyClass}`}>
+                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-ms-muted mb-4" style={{letterSpacing:'0.22em'}}>Fluxo Líquido Mensal</p>
+                <div className="flex items-start justify-between gap-3">
+                  <h2 className={`financial-display text-4xl sm:text-5xl md:text-6xl font-manrope ${privacyClass}`} style={{color:'#e7e4ec',fontVariantNumeric:'tabular-nums',letterSpacing:'-0.04em'}}>
                     R$ {totalMonthlyFlow.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </h2>
-                  <div className={`shrink-0 rounded-2xl border px-3 py-2 text-right ${totalMonthlyFlow >= 0 ? 'border-emerald-500/20 bg-emerald-500/10' : 'border-rose-500/20 bg-rose-500/10'}`}>
-                    <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Status</p>
-                    <p className={`text-sm font-black ${balanceTone}`}>
+                  <div className="shrink-0 px-3 py-2 text-left" style={{backgroundColor: totalMonthlyFlow >= 0 ? 'rgba(78,222,163,0.08)' : 'rgba(255,111,126,0.08)',borderRadius:'4px'}}>
+                    <p className="text-[9px] font-black uppercase tracking-[0.18em] text-ms-muted">Status</p>
+                    <p className="text-sm font-black" style={{color: totalMonthlyFlow >= 0 ? '#4edea3' : '#ff6f7e'}}>
                       {totalMonthlyFlow >= 0 ? 'Saudável' : 'Ajustar'}
                     </p>
                   </div>
                 </div>
 
-                <div className={`${isSummaryCollapsed ? 'hidden md:grid' : 'grid'} mt-5 grid-cols-3 gap-2 transition-all duration-300`}>
-                  <div className="rounded-2xl border border-white/5 bg-white/[0.03] px-3 py-3">
-                    <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-500">Entradas</p>
-                    <p className={`mt-2 text-sm font-black text-emerald-300 ${privacyClassText}`}>
+                <div className={`${isSummaryCollapsed ? 'hidden md:grid' : 'grid'} mt-8 grid-cols-3 gap-2`}>
+                  <div className="px-3 py-3" style={{backgroundColor:'#25252b',borderRadius:'4px'}}>
+                    <p className="text-[9px] font-black uppercase tracking-[0.18em] text-ms-muted">Entradas</p>
+                    <p className={`mt-2 text-sm font-black tnum ${privacyClassText}`} style={{color:'#4edea3'}}>
                       R$ {formatCompact(currentIncome)}
                     </p>
                   </div>
-                  <div className="rounded-2xl border border-white/5 bg-white/[0.03] px-3 py-3">
-                    <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-500">Saídas</p>
-                    <p className={`mt-2 text-sm font-black text-slate-100 ${privacyClassText}`}>
+                  <div className="px-3 py-3" style={{backgroundColor:'#25252b',borderRadius:'4px'}}>
+                    <p className="text-[9px] font-black uppercase tracking-[0.18em] text-ms-muted">Saídas</p>
+                    <p className={`mt-2 text-sm font-black tnum ${privacyClassText}`} style={{color:'#ff6f7e'}}>
                       R$ {formatCompact(currentExpense)}
                     </p>
                   </div>
-                  <div className="rounded-2xl border border-white/5 bg-white/[0.03] px-3 py-3">
-                    <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-500">Pendências</p>
-                    <p className={`mt-2 text-sm font-black ${pendingExpense > 0 ? 'text-amber-300' : 'text-slate-200'} ${privacyClassText}`}>
+                  <div className="px-3 py-3" style={{backgroundColor:'#25252b',borderRadius:'4px'}}>
+                    <p className="text-[9px] font-black uppercase tracking-[0.18em] text-ms-muted">Pendências</p>
+                    <p className={`mt-2 text-sm font-black tnum ${privacyClassText}`} style={{color: pendingExpense > 0 ? '#ffb148' : '#e7e4ec'}}>
                       R$ {formatCompact(pendingIncome + pendingExpense)}
                     </p>
                   </div>
                 </div>
               </div>
 
-              <div className={`${isSummaryCollapsed ? 'hidden md:flex' : 'flex'} mt-8 pt-6 border-t border-white/5 items-start justify-between gap-4 transition-all duration-300`}>
+              <div className={`${isSummaryCollapsed ? 'hidden md:flex' : 'flex'} mt-8 pt-6 items-start justify-between gap-4`} style={{borderTop:'1px solid rgba(71,71,78,0.15)'}}>
                 <div>
-                  <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.15em] mb-2">
-                    Projeção Final
-                  </p>
+                  <p className="text-ms-muted text-[10px] font-black uppercase tracking-[0.15em] mb-2">Projeção Final</p>
                   <div className={`flex items-center gap-2 ${privacyClass}`}>
-                    <span className={`text-xl md:text-2xl font-black ${finalMonthProjection >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    <span className="text-xl md:text-2xl font-black font-manrope tnum" style={{color: finalMonthProjection >= 0 ? '#4edea3' : '#ff6f7e'}}>
                       R$ {finalMonthProjection.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                 </div>
                 <div className="text-right shrink-0">
-                  <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.15em] mb-2">
-                    Patrimônio Hoje
-                  </p>
-                  <p className={`text-base md:text-lg font-bold text-slate-200 ${privacyClass}`}>
+                  <p className="text-ms-muted text-[10px] font-black uppercase tracking-[0.15em] mb-2">Patrimônio Hoje</p>
+                  <p className={`text-base md:text-lg font-bold tnum ${privacyClass}`} style={{color:'#e7e4ec'}}>
                     R$ {totalRealBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </p>
                 </div>
               </div>
 
-              <button 
+              <button
                 onClick={() => setIsSummaryCollapsed(!isSummaryCollapsed)}
-                className="md:hidden mt-4 w-full py-2 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 hover:text-white transition-colors border-t border-white/5 pt-4"
+                className="md:hidden mt-4 w-full py-2 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-ms-muted hover:text-ms-on transition-colors pt-4"
+                style={{borderTop:'1px solid rgba(71,71,78,0.15)'}}
               >
-                {isSummaryCollapsed ? 'Ver Detalhes do Mês' : 'Recolher Detalhes'}
+                {isSummaryCollapsed ? 'Ver Detalhes' : 'Recolher'}
                 {isSummaryCollapsed ? <ChevronRight size={14} className="rotate-90" /> : <ChevronRight size={14} className="-rotate-90" />}
               </button>
             </div>
@@ -390,73 +410,70 @@ export const Dashboard: React.FC<DashboardProps> = ({
           {/* Secondary Cards Column */}
           <div className="md:col-span-6 grid grid-cols-2 gap-4 md:gap-6">
 
-            {/* Income Card (Month) */}
-            {/* Income Card (Month) */}
-            <div className="bg-zinc-900 border border-white/5 p-6 rounded-2xl flex flex-col justify-between hover:border-emerald-500/30 transition-all duration-300 group min-h-[154px]">
+            {/* Income Card */}
+            <div className="p-6 flex flex-col justify-between min-h-[154px]" style={{backgroundColor:'#19191d',borderRadius:'4px'}}>
               <div className="flex justify-between items-start">
-                <div className="p-3 bg-emerald-500/10 rounded-2xl text-emerald-500 group-hover:bg-emerald-500 group-hover:text-black transition-all duration-300">
-                  <TrendingUp size={20} />
+                <div className="p-2" style={{backgroundColor:'rgba(78,222,163,0.08)',borderRadius:'4px'}}>
+                  <TrendingUp size={18} style={{color:'#4edea3'}} />
                 </div>
                 {pendingIncome > 0 && (
-                  <span className="text-[9px] bg-emerald-500/10 px-2 py-1 rounded-full text-emerald-400 border border-emerald-500/20 font-bold">
+                  <span className="text-[9px] badge-income px-2 py-1 font-bold tnum">
                     + R$ {formatCompact(pendingIncome)}
                   </span>
                 )}
               </div>
               <div>
-                <p className="text-slate-500 text-[11px] font-bold uppercase tracking-wider mt-4">Entradas</p>
-                <h3 className={`text-xl sm:text-3xl font-black text-emerald-400 mt-1 ${privacyClassText}`}>
+                <p className="text-[11px] font-black uppercase tracking-wider mt-4 text-ms-muted">Entradas</p>
+                <h3 className={`text-xl sm:text-3xl font-black font-manrope tnum mt-1 ${privacyClassText}`} style={{color:'#4edea3'}}>
                   R$ {currentIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </h3>
               </div>
             </div>
 
-            {/* Expense Card (Month) */}
-            {/* Expense Card (Month) */}
-            <div className="bg-zinc-900 border border-white/5 p-6 rounded-2xl flex flex-col justify-between hover:border-rose-500/30 transition-all duration-300 group min-h-[154px]">
+            {/* Expense Card */}
+            <div className="p-6 flex flex-col justify-between min-h-[154px]" style={{backgroundColor:'#19191d',borderRadius:'4px'}}>
               <div className="flex justify-between items-start">
-                <div className="p-3 bg-rose-500/10 rounded-2xl text-rose-500 group-hover:bg-rose-500 group-hover:text-white transition-all duration-300">
-                  <TrendingDown size={20} />
+                <div className="p-2" style={{backgroundColor:'rgba(255,111,126,0.08)',borderRadius:'4px'}}>
+                  <TrendingDown size={18} style={{color:'#ff6f7e'}} />
                 </div>
                 {pendingExpense > 0 && (
-                  <span className="text-[9px] bg-rose-500/10 px-2 py-1 rounded-full text-rose-400 border border-rose-500/20 font-bold">
+                  <span className="text-[9px] badge-expense px-2 py-1 font-bold tnum">
                     + R$ {formatCompact(pendingExpense)}
                   </span>
                 )}
               </div>
               <div>
-                <p className="text-slate-500 text-[11px] font-bold uppercase tracking-wider mt-4">Saídas</p>
-                <h3 className={`text-xl sm:text-3xl font-black text-slate-100 mt-1 ${privacyClassText}`}>
+                <p className="text-[11px] font-black uppercase tracking-wider mt-4 text-ms-muted">Saídas</p>
+                <h3 className={`text-xl sm:text-3xl font-black font-manrope tnum mt-1 ${privacyClassText}`} style={{color:'#e7e4ec'}}>
                   R$ {currentExpense.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </h3>
               </div>
             </div>
 
-            {/* Budget Summary Mini-Card */}
-            {/* Budget Summary Mini-Card */}
-            <div className="col-span-2 bg-zinc-900 p-4 rounded-xl border border-white/5 flex items-center justify-between gap-4">
+            {/* Savings Rate Mini-Card */}
+            <div className="col-span-2 p-4 flex items-center justify-between gap-4" style={{backgroundColor:'#25252b',borderRadius:'4px'}}>
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-slate-700 rounded-xl text-slate-300">
-                  <PiggyBank size={20} />
+                <div className="p-2" style={{backgroundColor:'rgba(78,222,163,0.08)',borderRadius:'4px'}}>
+                  <PiggyBank size={18} style={{color:'#4edea3'}} />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-slate-200">Economia do Mês</p>
-                  <p className="text-xs text-slate-500">Receitas - Despesas</p>
+                  <p className="text-sm font-bold" style={{color:'#e7e4ec'}}>Economia do Mês</p>
+                  <p className="text-xs text-ms-muted">Receitas − Despesas</p>
                 </div>
               </div>
-              <span className={`font-bold text-lg ${monthlyBalance >= 0 ? 'text-white' : 'text-rose-400'} ${privacyClassText}`}>
+              <span className={`font-bold text-lg tnum font-manrope ${privacyClassText}`} style={{color: monthlyBalance >= 0 ? '#4edea3' : '#ff6f7e'}}>
                 {savingsRate.toFixed(0)}%
               </span>
             </div>
           </div>
         </div>
 
-        {/* Account Balances Section (Horizontal Scroll) - MENSAL ISOLADO */}
+        {/* Account Balances Section */}
         <div className="w-full overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 md:px-0">
           <div className="mb-4 flex items-center justify-between px-1">
             <div>
-              <h3 className="text-sm font-bold tracking-tight text-zinc-100">Contas</h3>
-              <p className="text-xs text-zinc-500 mt-1">Toque em uma conta para ajustar o saldo do mês.</p>
+              <h3 className="text-sm font-bold tracking-tight font-manrope" style={{color:'#e7e4ec'}}>Contas</h3>
+              <p className="text-xs text-ms-muted mt-1">Toque em uma conta para ajustar.</p>
             </div>
           </div>
 
@@ -465,34 +482,31 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <div
                 key={acc.name}
                 onClick={() => handleAccountClick(acc.name as string, acc.balance)}
-                className="bg-zinc-900 p-5 rounded-2xl border border-white/5 min-w-[180px] md:min-w-[200px] flex flex-col justify-between transition-all group cursor-pointer hover:border-zinc-700 snap-start"
+                className="p-5 min-w-[180px] md:min-w-[200px] flex flex-col justify-between cursor-pointer snap-start transition-opacity hover:opacity-80"
+                style={{backgroundColor:'#19191d',borderRadius:'4px'}}
               >
-                <div className="flex items-center justify-between text-zinc-500 mb-4">
+                <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
-                    <div className="p-1.5 bg-zinc-800 rounded-md text-zinc-400 group-hover:text-zinc-200 transition-colors">
-                      <CreditCard size={14} />
-                    </div>
-                    <span className="text-[11px] font-bold tracking-wide text-zinc-300">{acc.name}</span>
+                    <CreditCard size={14} className="text-ms-muted" />
+                    <span className="text-[11px] font-bold tracking-wide" style={{color:'#e7e4ec'}}>{acc.name}</span>
                   </div>
-                  <Edit2 size={14} className="opacity-0 md:group-hover:opacity-100 transition-opacity" />
+                  <Edit2 size={12} className="text-ms-muted opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
                 <div className="flex flex-col">
-                  <span className="text-[10px] text-zinc-500 font-medium mb-1">Saldo Disponível</span>
-                  <p className={`text-xl font-bold ${acc.balance >= 0 ? 'text-zinc-100' : 'text-rose-500'} ${privacyClassText} tracking-tight`}>
+                  <span className="text-[10px] text-ms-muted font-medium mb-1">Saldo Disponível</span>
+                  <p className={`text-xl font-bold tnum font-manrope tracking-tight ${privacyClassText}`} style={{color: acc.balance >= 0 ? '#e7e4ec' : '#ff6f7e'}}>
                     R$ {acc.balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </p>
                 </div>
               </div>
             ))}
             {accountBalances.length === 0 && (
-              <div className="text-slate-500 text-sm italic p-4">
+              <div className="text-ms-muted text-sm italic p-4">
                 Registre transações neste mês para ver o fluxo das contas.
               </div>
             )}
           </div>
-          <p className="text-[10px] text-slate-500 mt-2 px-1">
-            * Valores refletem apenas entradas e saídas deste mês.
-          </p>
+          <p className="text-[10px] text-ms-muted mt-2 px-1">* Valores refletem apenas entradas e saídas deste mês.</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -501,120 +515,209 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <div className="lg:col-span-7 space-y-4">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4 mt-8">
               <div>
-                <h3 className="text-lg font-bold text-zinc-100 tracking-tight">Movimentações</h3>
-                <p className="text-xs text-zinc-500 mt-1">Toque para editar ou marque como concluído.</p>
+                <h3 className="text-lg font-bold font-manrope tracking-tight" style={{color:'#e7e4ec'}}>Movimentações</h3>
+                <p className="text-xs text-ms-muted mt-1">Toque para editar ou marque como concluído.</p>
               </div>
-              <div className="flex bg-zinc-900 border border-white/5 rounded-xl p-1 overflow-x-auto">
-                {/* Botões de Filtro Atualizados */}
-                {(['all', 'income', 'expense', 'pending'] as const).map(type => (
+              <div className="flex p-1 overflow-x-auto" style={{backgroundColor:'#19191d',borderRadius:'4px'}}>
+                {(['all', 'income', 'expense', 'pending'] as const).map(fType => (
                   <button
-                    key={type}
-                    onClick={() => setFilterType(type)}
-                    className={`px-4 py-2 text-[11px] font-medium rounded-lg transition-colors whitespace-nowrap ${filterType === type
-                      ? 'bg-zinc-800 text-zinc-100'
-                      : 'text-zinc-500 hover:text-zinc-300'
-                      }`}
+                    key={fType}
+                    onClick={() => setFilterType(fType)}
+                    className="px-4 py-2 text-[11px] font-medium whitespace-nowrap transition-colors"
+                    style={{
+                      borderRadius:'4px',
+                      backgroundColor: filterType === fType ? '#25252b' : 'transparent',
+                      color: filterType === fType ? '#e7e4ec' : '#acaab1'
+                    }}
                   >
-                    {type === 'all' ? 'Tudo' : type === 'income' ? 'Entradas' : type === 'expense' ? 'Saídas' : 'Pendentes'}
+                    {fType === 'all' ? 'Tudo' : fType === 'income' ? 'Entradas' : fType === 'expense' ? 'Saídas' : 'Pendentes'}
                   </button>
                 ))}
+                <button
+                  onClick={() => setIsGrouped(!isGrouped)}
+                  className={`ml-2 px-3 py-2 text-[11px] font-bold flex items-center gap-2 transition-all border border-white/5`}
+                  style={{
+                    borderRadius: '4px',
+                    backgroundColor: isGrouped ? 'rgba(78,222,163,0.1)' : 'transparent',
+                    color: isGrouped ? '#4edea3' : '#acaab1'
+                  }}
+                  title={isGrouped ? "Ver lista simples" : "Agrupar por categoria"}
+                >
+                  <Layers size={14} />
+                  <span className="hidden sm:inline">{isGrouped ? 'Agrupado' : 'Agrupar'}</span>
+                </button>
               </div>
             </div>
 
             {/* Container Scrollável para as transações */}
             <div className="space-y-px md:max-h-[600px] overflow-y-auto pr-0 md:pr-2 custom-scrollbar border-t border-white/5">
-              {paginatedTransactions.map(t => {
-                const isPaid = checkPaid(t);
-                const isTransfer = t.type === 'transfer';
-                
-                return (
-                  <div
-                    key={t.id}
-                    onClick={() => onEditTransaction(t)}
-                    className={`group flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between p-5 transition-all duration-200 border-b border-white/5 relative overflow-hidden cursor-pointer
-                    ${isPaid
-                        ? 'bg-slate-950/40 hover:bg-white/[0.03]'
-                        : 'bg-slate-900/10 opacity-60'
-                      }`}
-                  >
-                    {/* Lateral Status Bar */}
-                    <div className={`absolute left-0 top-0 bottom-0 w-[3px] transition-all duration-300
-                      ${t.type === 'income' ? 'bg-emerald-500' : isTransfer ? 'bg-blue-500' : 'bg-slate-700'}
-                      ${!isPaid ? 'opacity-30' : 'opacity-100'}
-                    `} />
+              {isGrouped ? (
+                /* VISÃO AGRUPADA (ACCORDION) */
+                <div className="space-y-3 pt-4">
+                  {categoryGroups.map(([category, items]) => {
+                    const isExpanded = expandedCategories.has(category);
+                    const totalAmount = items.reduce((sum, item) => {
+                      const val = Number(item.amount);
+                      return item.type === 'income' ? sum + val : sum - val;
+                    }, 0);
 
-                    <div className="flex items-center gap-5 flex-1 min-w-0">
-                      <div className={`w-11 h-11 rounded-sm flex items-center justify-center shrink-0 border transition-all duration-500
-                      ${t.type === 'income'
-                          ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-500 group-hover:bg-emerald-500 group-hover:text-black'
-                          : isTransfer
-                          ? 'bg-blue-500/5 border-blue-500/20 text-blue-500 group-hover:bg-blue-500 group-hover:text-white'
-                          : 'bg-slate-800/40 border-slate-700/50 text-slate-500 group-hover:bg-slate-100 group-hover:text-black'
-                        } ${!isPaid ? 'grayscale opacity-30' : ''}`}>
-
-                        {isTransfer ? <Layers size={18} /> : t.type === 'income' ? <TrendingUp size={18} /> : <TrendingDown size={18} />}
-                      </div>
-
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-3">
-                          <p className={`font-bold truncate text-[15px] tracking-tight ${isPaid ? 'text-slate-100' : 'text-slate-500'}`}>
-                            {t.description}
-                          </p>
-                          {!isPaid && <Clock size={12} className="text-amber-500 shrink-0" />}
-                          {t.isRecurring && (
-                            <span className="text-[8px] px-1.5 py-0.5 rounded-sm bg-slate-800 text-slate-500 border border-white/5 font-black uppercase tracking-[0.15em]">Fixo</span>
-                          )}
-                        </div>
-                        
-                        <div className="text-[10px] text-slate-500 mt-1.5 flex items-center gap-2 font-black uppercase tracking-[0.12em]">
-                          <span className="text-slate-400">{formatDateDisplay(t.date)}</span>
-                          <span className="w-1 h-1 bg-slate-800 rounded-full" />
-                          
-                          {isTransfer ? (
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-slate-300">{t.account}</span>
-                              <ChevronRight size={10} className="text-slate-600" />
-                              <span className="text-blue-400">{t.destinationAccount}</span>
-                            </div>
-                          ) : (
-                            <span className="text-slate-400">{t.account || 'Carteira'}</span>
-                          )}
-                          
-                          <span className="w-1 h-1 bg-slate-800 rounded-full" />
-                          <span className={`${t.type === 'income' ? 'text-emerald-500/60' : isTransfer ? 'text-blue-500/60' : 'text-slate-600'}`}>
-                            {t.category}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between sm:flex-col sm:items-end gap-3 sm:gap-2">
-                      <span
-                        className={`font-black text-base sm:text-[17px] tracking-tighter transition-all ${!isPaid ? 'text-slate-700' :
-                          privacyMode ? privacyClassText :
-                            (t.type === 'income' ? 'text-emerald-400' : isTransfer ? 'text-blue-400' : 'text-slate-100')
-                          }`}
-                      >
-                        {t.type === 'income' ? '+' : '-'} R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </span>
-
-                      {onToggleStatus && (
+                    return (
+                      <div key={category} className="overflow-hidden" style={{ backgroundColor: '#19191d', borderRadius: '4px' }}>
                         <button
-                          onClick={(e) => { e.stopPropagation(); onToggleStatus(t); }}
-                          className={`text-[9px] flex items-center gap-1.5 font-black uppercase tracking-[0.18em] transition-all rounded-sm px-2.5 py-1 border ${isPaid
-                            ? 'bg-emerald-500/5 border-emerald-500/0 text-emerald-500/40 group-hover:border-emerald-500/20 group-hover:text-emerald-500'
-                            : 'bg-amber-500/5 border-amber-500/20 text-amber-500/80 hover:bg-emerald-500/10 hover:border-emerald-500/30 hover:text-emerald-400'
+                          onClick={() => toggleCategory(category)}
+                          className="w-full flex items-center justify-between p-4 hover:bg-white/[0.02] transition-colors"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={`p-2 rounded-sm ${totalAmount >= 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>
+                              <PieChartIcon size={16} />
+                            </div>
+                            <div className="text-left">
+                              <h4 className="text-sm font-bold text-slate-100">{category}</h4>
+                              <p className="text-[10px] text-ms-muted uppercase font-black tracking-widest">
+                                {items.length} {items.length === 1 ? 'item' : 'itens'}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <span className={`text-sm font-black tnum ${privacyClassText} ${totalAmount >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                              R$ {Math.abs(totalAmount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </span>
+                            <ChevronRight size={16} className={`text-ms-muted transition-transform duration-300 ${isExpanded ? 'rotate-90' : ''}`} />
+                          </div>
+                        </button>
+
+                        {isExpanded && (
+                          <div className="border-t border-white/5 animate-in slide-in-from-top-2 duration-300">
+                            {items.map(t => {
+                              const isPaid = checkPaid(t);
+                              const isTransfer = t.type === 'transfer';
+                              return (
+                                <div
+                                  key={t.id}
+                                  onClick={(e) => { e.stopPropagation(); onEditTransaction(t); }}
+                                  className="flex items-center justify-between p-4 pl-12 hover:bg-white/[0.03] border-b border-white/[0.02] cursor-pointer group"
+                                >
+                                  <div className="flex flex-col">
+                                    <span className={`text-sm font-bold ${isPaid ? 'text-slate-200' : 'text-slate-500'}`}>{t.description}</span>
+                                    <span className="text-[10px] text-slate-500 mt-0.5">{formatDateDisplay(t.date)} • {t.account || 'Carteira'}</span>
+                                  </div>
+                                  <div className="flex items-center gap-3">
+                                    <span className={`text-xs font-black tnum ${privacyClassText} ${t.type === 'income' ? 'text-emerald-500' : 'text-slate-300'}`}>
+                                      {t.type === 'income' ? '+' : '-'} R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                    </span>
+                                    {onToggleStatus && (
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); onToggleStatus(t); }}
+                                        className={`p-1 rounded-full transition-colors ${isPaid ? 'text-emerald-500/40 hover:text-emerald-500' : 'text-amber-500'}`}
+                                      >
+                                        {isPaid ? <CheckCircle2 size={14} /> : <Clock size={14} />}
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                /* VISÃO LISTA PADRÃO */
+                paginatedTransactions.map(t => {
+                  const isPaid = checkPaid(t);
+                  const isTransfer = t.type === 'transfer';
+                  
+                  return (
+                    <div
+                      key={t.id}
+                      onClick={() => onEditTransaction(t)}
+                      className={`group flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between p-5 transition-all duration-200 border-b border-white/5 relative overflow-hidden cursor-pointer
+                      ${isPaid
+                          ? 'bg-slate-950/40 hover:bg-white/[0.03]'
+                          : 'bg-slate-900/10 opacity-60'
+                        }`}
+                    >
+                      {/* Lateral Status Bar */}
+                      <div className={`absolute left-0 top-0 bottom-0 w-[3px] transition-all duration-300
+                        ${t.type === 'income' ? 'bg-emerald-500' : isTransfer ? 'bg-blue-500' : 'bg-slate-700'}
+                        ${!isPaid ? 'opacity-30' : 'opacity-100'}
+                      `} />
+
+                      <div className="flex items-center gap-5 flex-1 min-w-0">
+                        <div className={`w-11 h-11 rounded-sm flex items-center justify-center shrink-0 border transition-all duration-500
+                        ${t.type === 'income'
+                            ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-500 group-hover:bg-emerald-500 group-hover:text-black'
+                            : isTransfer
+                            ? 'bg-blue-500/5 border-blue-500/20 text-blue-500 group-hover:bg-blue-500 group-hover:text-white'
+                            : 'bg-slate-800/40 border-slate-700/50 text-slate-500 group-hover:bg-slate-100 group-hover:text-black'
+                          } ${!isPaid ? 'grayscale opacity-30' : ''}`}>
+
+                          {isTransfer ? <Layers size={18} /> : t.type === 'income' ? <TrendingUp size={18} /> : <TrendingDown size={18} />}
+                        </div>
+
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-3">
+                            <p className={`font-bold truncate text-[15px] tracking-tight ${isPaid ? 'text-slate-100' : 'text-slate-500'}`}>
+                              {t.description}
+                            </p>
+                            {!isPaid && <Clock size={12} className="text-amber-500 shrink-0" />}
+                            {t.isRecurring && (
+                              <span className="text-[8px] px-1.5 py-0.5 rounded-sm bg-slate-800 text-slate-500 border border-white/5 font-black uppercase tracking-[0.15em]">Fixo</span>
+                            )}
+                          </div>
+                          
+                          <div className="text-[10px] text-slate-500 mt-1.5 flex items-center gap-2 font-black uppercase tracking-[0.12em]">
+                            <span className="text-slate-400">{formatDateDisplay(t.date)}</span>
+                            <span className="w-1 h-1 bg-slate-800 rounded-full" />
+                            
+                            {isTransfer ? (
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-slate-300">{t.account}</span>
+                                <ChevronRight size={10} className="text-slate-600" />
+                                <span className="text-blue-400">{t.destinationAccount}</span>
+                              </div>
+                            ) : (
+                              <span className="text-slate-400">{t.account || 'Carteira'}</span>
+                            )}
+                            
+                            <span className="w-1 h-1 bg-slate-800 rounded-full" />
+                            <span className={`${t.type === 'income' ? 'text-emerald-500/60' : isTransfer ? 'text-blue-500/60' : 'text-slate-600'}`}>
+                              {t.category}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between sm:flex-col sm:items-end gap-3 sm:gap-2">
+                        <span
+                          className={`font-black text-base sm:text-[17px] tracking-tighter transition-all ${!isPaid ? 'text-slate-700' :
+                            privacyMode ? privacyClassText :
+                              (t.type === 'income' ? 'text-emerald-400' : isTransfer ? 'text-blue-400' : 'text-slate-100')
                             }`}
                         >
-                          {isPaid ? <CheckCircle2 size={11} /> : <span>Pendente</span>}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
+                          {t.type === 'income' ? '+' : '-'} R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </span>
 
-              {hasMoreItems && (
+                        {onToggleStatus && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); onToggleStatus(t); }}
+                            className={`text-[9px] flex items-center gap-1.5 font-black uppercase tracking-[0.18em] transition-all rounded-sm px-2.5 py-1 border ${isPaid
+                              ? 'bg-emerald-500/5 border-emerald-500/0 text-emerald-500/40 group-hover:border-emerald-500/20 group-hover:text-emerald-500'
+                              : 'bg-amber-500/5 border-amber-500/20 text-amber-500/80 hover:bg-emerald-500/10 hover:border-emerald-500/30 hover:text-emerald-400'
+                              }`}
+                          >
+                            {isPaid ? <CheckCircle2 size={11} /> : <span>Pendente</span>}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })
+              )}
+
+              {!isGrouped && hasMoreItems && (
                 <div className="pt-6 flex justify-center">
                   <button 
                     onClick={() => setItemsToShow(prev => prev + 10)}
@@ -644,25 +747,29 @@ export const Dashboard: React.FC<DashboardProps> = ({
           {/* Right Column: Chart & Alerts */}
           <div className="lg:col-span-5 space-y-6">
             {/* Distribution Chart Section */}
-            <div className="glass-card p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] flex flex-col hover:border-white/10 transition-all duration-300 relative group">
+            <div className="p-5 md:p-8 flex flex-col" style={{backgroundColor:'#19191d',borderRadius:'4px'}}>
               <div className="flex items-center justify-between gap-3 mb-6 md:mb-8">
-                <h3 className="text-xl font-extrabold text-white tracking-tight">Distribuição</h3>
-                <div className="flex glass rounded-xl p-1">
+                <h3 className="text-xl font-extrabold font-manrope tracking-tight" style={{color:'#e7e4ec'}}>Distribuição</h3>
+                <div className="flex p-1" style={{backgroundColor:'#25252b',borderRadius:'4px'}}>
                   <button
                     onClick={() => setChartType('expense')}
-                    className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${chartType === 'expense'
-                      ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/20'
-                      : 'text-slate-500 hover:text-white'
-                    }`}
+                    className="px-3 py-1.5 text-xs font-bold transition-all"
+                    style={{
+                      borderRadius:'4px',
+                      backgroundColor: chartType === 'expense' ? '#ff6f7e' : 'transparent',
+                      color: chartType === 'expense' ? '#fff' : '#acaab1'
+                    }}
                   >
                     Saídas
                   </button>
                   <button
                     onClick={() => setChartType('income')}
-                    className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${chartType === 'income'
-                      ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20'
-                      : 'text-slate-500 hover:text-white'
-                    }`}
+                    className="px-3 py-1.5 text-xs font-bold transition-all"
+                    style={{
+                      borderRadius:'4px',
+                      backgroundColor: chartType === 'income' ? '#4edea3' : 'transparent',
+                      color: chartType === 'income' ? '#004a31' : '#acaab1'
+                    }}
                   >
                     Entradas
                   </button>
@@ -745,13 +852,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
             {/* Alerts & Budgets */}
             {budgets.some(b => b.spent > b.limit * 0.9) && (
-              <div className="p-5 bg-rose-500/5 border border-rose-500/10 rounded-[2rem] flex items-start gap-4 backdrop-blur-md">
-                <div className="p-3 bg-rose-500/20 rounded-2xl text-rose-500">
-                  <AlertTriangle size={24} />
+              <div className="p-5 flex items-start gap-4" style={{backgroundColor:'rgba(255,111,126,0.06)',borderRadius:'4px'}}>
+                <div className="p-3" style={{backgroundColor:'rgba(255,111,126,0.15)',borderRadius:'4px'}}>
+                  <AlertTriangle size={20} style={{color:'#ff6f7e'}} />
                 </div>
                 <div>
-                  <p className="text-sm font-black text-rose-400 uppercase tracking-widest">Atenção Crítica</p>
-                  <p className="text-xs text-slate-400 mt-1 leading-relaxed">Você atingiu 90% do limite em um ou mais orçamentos este mês.</p>
+                  <p className="text-sm font-black uppercase tracking-widest" style={{color:'#ff6f7e'}}>Atenção Crítica</p>
+                  <p className="text-xs text-ms-muted mt-1 leading-relaxed">Você atingiu 90% do limite em um ou mais orçamentos este mês.</p>
                 </div>
               </div>
             )}
