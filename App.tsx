@@ -3,7 +3,7 @@ import { View, Transaction, Budget, Goal, TransactionType } from './types';
 import { LayoutDashboard, Plus, PieChart, BarChart3, ShoppingCart, Calendar as CalendarIcon, Eye, EyeOff, LogOut, CreditCard, Download, Wallet, CalendarRange } from 'lucide-react';
 import { Dashboard } from './components/Dashboard';
 import { QuickAdd } from './components/QuickAdd';
-import { BudgetGoals } from './components/BudgetGoals';
+import { Savings } from './components/Savings';
 import { Reports } from './components/Reports';
 import { ShoppingList } from './components/ShoppingList';
 import { CalendarView } from './components/CalendarView';
@@ -14,7 +14,7 @@ import { TravelModeSettings } from './components/TravelMode';
 import { CategorySettings } from './components/CategorySettings';
 import { TravelProvider } from './context/TravelContext';
 import { CategoryProvider } from './context/CategoryContext';
-import { PiggyBank, Settings } from 'lucide-react';
+import { PiggyBank, Settings, AlertTriangle } from 'lucide-react';
 
 import { DeleteSeriesModal } from './components/DeleteSeriesModal';
 import { CustomDialog } from './components/CustomDialog';
@@ -107,7 +107,8 @@ const App: React.FC = () => {
     isPaid: boolean = true,
     splits?: { account: string; amount: number }[],
     destinationAccount?: string,
-    tags?: string[]
+    tags?: string[],
+    isPriority?: boolean
   ) => {
 
     const newTransactions: any[] = [];
@@ -133,6 +134,7 @@ const App: React.FC = () => {
           type,
           isRecurring: false,
           isPaid: isThisInstallmentPaid,
+          isPriority,
           splits: (i === currentInstallment) ? splits : undefined, // Only split the first installment for now (simplification)
           tags // Passa a tag (envelope)
         });
@@ -158,6 +160,7 @@ const App: React.FC = () => {
           type,
           isRecurring: true,
           isPaid: isThisItemPaid,
+          isPriority,
           splits: (i === 0) ? splits : undefined,
           destinationAccount: (i === 0) ? destinationAccount : undefined,
           tags // Passa a tag
@@ -174,6 +177,7 @@ const App: React.FC = () => {
         type,
         isRecurring,
         isPaid,
+        isPriority,
         splits,
         destinationAccount,
         tags // Passa a tag
@@ -262,7 +266,8 @@ const App: React.FC = () => {
       1,
       true,
       undefined,
-      undefined
+      undefined,
+      false
     );
   };
 
@@ -443,7 +448,7 @@ const App: React.FC = () => {
   const navItems = [
     { view: View.DASHBOARD, label: 'Início', icon: LayoutDashboard },
     { view: View.CALENDAR, label: 'Calendário', icon: CalendarIcon },
-    { view: View.BUDGETS, label: 'Planejamento', icon: PieChart },
+    { view: View.SAVINGS, label: 'Poupança', icon: PiggyBank },
     { view: View.SHOPPING_LIST, label: 'Lista', icon: ShoppingCart },
     { view: View.REPORTS, label: 'Relatórios', icon: BarChart3 },
     { view: View.SETTINGS, label: 'Ajustes', icon: Settings },
@@ -454,8 +459,8 @@ const App: React.FC = () => {
     ? 'Resumo do mês, contas e movimentações mais recentes.'
     : currentView === View.CALENDAR
       ? 'Navegue pelo mês e ajuste registros direto no calendário.'
-      : currentView === View.BUDGETS
-        ? 'Metas e limites com foco no que exige atenção agora.'
+      : currentView === View.SAVINGS
+        ? 'Acompanhe seus depósitos e o rendimento da sua reserva.'
         : currentView === View.SHOPPING_LIST
           ? 'Lista rápida para compras e lançamento ao finalizar.'
           : 'Leitura do comportamento financeiro com mais contexto.';
@@ -651,19 +656,8 @@ const App: React.FC = () => {
             {currentView === View.SHOPPING_LIST && (
               <ShoppingList onFinishShopping={handleFinishShopping} />
             )}
-            {currentView === View.BUDGETS && (
-              <BudgetGoals
-                budgets={budgets}
-                goals={goals}
-                transactions={allTransactions}
-                onAddGoal={handleAddGoal}
-                onUpdateGoal={handleUpdateGoal}
-                onDeleteGoal={handleDeleteGoal}
-                onAddBudget={handleAddBudget}
-                onUpdateBudget={handleUpdateBudget}
-                onDeleteBudget={handleDeleteBudget}
-                privacyMode={privacyMode}
-              />
+            {currentView === View.SAVINGS && (
+              <Savings transactions={allTransactions} privacyMode={privacyMode} />
             )}
             {currentView === View.REPORTS && <Reports transactions={allTransactions} />}
             {currentView === View.SETTINGS && (

@@ -19,6 +19,7 @@ const mapDocumentToTransaction = (doc: any): Transaction => ({
   groupId: doc.group_id,
   isRecurring: doc.is_recurring,
   isPaid: doc.is_paid,
+  isPriority: doc.is_priority,
   paymentMethod: doc.payment_method,
   attachmentId: doc.attachment_id,
   tags: doc.tags,
@@ -74,6 +75,7 @@ export const financeService = {
             group_id: t.groupId || null,
             is_recurring: t.isRecurring || false,
             is_paid: t.isPaid ?? true,
+            is_priority: t.isPriority || false,
             payment_method: t.paymentMethod || 'money',
             attachment_id: t.attachmentId || null,
             tags: t.tags || [],
@@ -104,6 +106,7 @@ export const financeService = {
       if (updates.type !== undefined) payload.type = updates.type;
       if (updates.isRecurring !== undefined) payload.is_recurring = updates.isRecurring;
       if (updates.isPaid !== undefined) payload.is_paid = updates.isPaid;
+      if (updates.isPriority !== undefined) payload.is_priority = updates.isPriority;
       if (updates.paymentMethod !== undefined) payload.payment_method = updates.paymentMethod;
       if (updates.attachmentId !== undefined) payload.attachment_id = updates.attachmentId;
       if (updates.groupId !== undefined) payload.group_id = updates.groupId;

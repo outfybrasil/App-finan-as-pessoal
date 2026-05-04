@@ -69,6 +69,7 @@ async function setup() {
             await createAttributeSafely(databases.createStringAttribute(DATABASE_ID, transactionsId, 'group_id', 100, false), 'group_id');
             await createAttributeSafely(databases.createBooleanAttribute(DATABASE_ID, transactionsId, 'is_recurring', false, false), 'is_recurring');
             await createAttributeSafely(databases.createBooleanAttribute(DATABASE_ID, transactionsId, 'is_paid', false, true), 'is_paid');
+            await createAttributeSafely(databases.createBooleanAttribute(DATABASE_ID, transactionsId, 'is_priority', false, false), 'is_priority');
             await createAttributeSafely(databases.createStringAttribute(DATABASE_ID, transactionsId, 'user_id', 100, true), 'user_id');
 
             // New fields for Phase 2

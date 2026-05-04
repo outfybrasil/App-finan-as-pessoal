@@ -16,6 +16,7 @@ export interface Transaction {
   type: TransactionType;
   isRecurring?: boolean; // Para identificar despesas fixas visualmente
   isPaid?: boolean; // Status de pagamento (Pago/Recebido ou Pendente)
+  isPriority?: boolean; // [NEW] Para destacar despesas prioritárias
   paymentMethod?: 'credit' | 'debit' | 'pix' | 'cash'; // [NEW] Forma de pagamento
   attachmentId?: string; // [NEW] ID da foto do comprovante no Storage
   tags?: string[]; // [NEW] Tags para organizar
@@ -72,10 +73,10 @@ export interface ShoppingItem {
 export enum View {
   DASHBOARD = 'dashboard',
   QUICK_ADD = 'quick_add',
-  BUDGETS = 'budgets',
+  SAVINGS = 'savings',
   REPORTS = 'reports',
   INSIGHTS = 'insights',
   SHOPPING_LIST = 'shopping_list',
   CALENDAR = 'calendar',
   SETTINGS = 'settings'
-}
+}

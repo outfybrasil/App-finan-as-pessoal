@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTravelMode } from '../context/TravelContext';
 import { Transaction, TransactionType } from '../types';
-import { TrendingUp, TrendingDown, FileText, X, CalendarClock, Trash2, Layers, Info, CheckCircle2, Clock, CreditCard, Plus, Minus, Calculator, ChevronRight, ArrowDownCircle, ArrowUpCircle, PiggyBank, Save } from 'lucide-react';
+import { TrendingUp, TrendingDown, FileText, X, CalendarClock, Trash2, Layers, Info, CheckCircle2, Clock, CreditCard, Plus, Minus, Calculator, ChevronRight, ArrowDownCircle, ArrowUpCircle, PiggyBank, Save, AlertTriangle } from 'lucide-react';
 import { CustomDialog } from './CustomDialog';
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, ACCOUNT_OPTIONS } from '../constants/categories';
 import { useCategories } from '../context/CategoryContext';
@@ -55,6 +55,7 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
   const [type, setType] = useState<TransactionType>('expense');
   const [date, setDate] = useState(getLocalDate());
   const [isPaid, setIsPaid] = useState(true);
+  const [isPriority, setIsPriority] = useState(false);
   const [isRecurring, setIsRecurring] = useState(false);
   const [isInstallmentMode, setIsInstallmentMode] = useState(false);
   const [currentInstallment, setCurrentInstallment] = useState(1);
@@ -114,6 +115,7 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
       setDate(initialData.date);
       setIsRecurring(!!initialData.isRecurring);
       setIsPaid(initialData.isPaid !== undefined ? initialData.isPaid : true);
+      setIsPriority(!!initialData.isPriority);
 
       let rawDesc = initialData.description;
       let detectedSeries = false;
@@ -208,6 +210,7 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
       type,
       isRecurring,
       isPaid,
+      isPriority,
       installments: isInstallmentMode ? installments : 1,
       currentInstallment: currentInstallment,
       splits: isSplitMode ? splits : undefined,
@@ -236,7 +239,8 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
         payload.isPaid,
         payload.splits,
         payload.destinationAccount,
-        payload.tags
+        payload.tags,
+        payload.isPriority
       );
     }
     if (showCustomCategoryInput && category.trim()) {
@@ -579,6 +583,31 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
                 </div>
                 <div className={`w-12 h-6 rounded-full p-1 transition-all duration-300 ${isPaid ? 'bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.3)]' : 'bg-slate-800'}`}>
                   <div className={`w-4 h-4 bg-white rounded-full shadow-lg transition-transform duration-300 ${isPaid ? 'translate-x-6' : 'translate-x-0'}`} />
+                </div>
+              </div>
+
+              {/* Priority Option */}
+              <div
+                onClick={() => setIsPriority(!isPriority)}
+                className={`group flex items-center gap-4 p-5 rounded-2xl border transition-all cursor-pointer ${isPriority
+                  ? 'bg-amber-500/5 border-amber-500/20'
+                  : 'bg-zinc-900 border-white/5'
+                  }`}
+              >
+                <div className={`w-12 h-12 rounded-2xl shadow-lg flex items-center justify-center shrink-0 transition-all duration-500 ${isPriority
+                  ? 'bg-amber-500 text-white shadow-amber-500/20 rotate-0'
+                  : 'bg-white/5 text-slate-500'
+                  }`}>
+                  <AlertTriangle size={24} />
+                </div>
+                <div className="flex-1">
+                  <p className={`text-sm font-black uppercase tracking-widest ${isPriority ? 'text-amber-400' : 'text-slate-400'}`}>
+                    Prioritário
+                  </p>
+                  <p className="text-[10px] font-bold text-slate-500 mt-0.5">Destacar como conta essencial</p>
+                </div>
+                <div className={`w-12 h-6 rounded-full p-1 transition-all duration-300 ${isPriority ? 'bg-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.3)]' : 'bg-slate-800'}`}>
+                  <div className={`w-4 h-4 bg-white rounded-full shadow-lg transition-transform duration-300 ${isPriority ? 'translate-x-6' : 'translate-x-0'}`} />
                 </div>
               </div>
 

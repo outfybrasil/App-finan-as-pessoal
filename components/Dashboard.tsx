@@ -369,7 +369,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   <div className="px-3 py-3" style={{backgroundColor:'#25252b',borderRadius:'4px'}}>
                     <p className="text-[9px] font-black uppercase tracking-[0.18em] text-ms-muted">Pendências</p>
                     <p className={`mt-2 text-sm font-black tnum ${privacyClassText}`} style={{color: pendingExpense > 0 ? '#ffb148' : '#e7e4ec'}}>
-                      R$ {formatCompact(pendingIncome + pendingExpense)}
+                      R$ {formatCompact(pendingExpense)}
                     </p>
                   </div>
                 </div>
@@ -594,7 +594,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                   className="flex items-center justify-between p-4 pl-12 hover:bg-white/[0.03] border-b border-white/[0.02] cursor-pointer group"
                                 >
                                   <div className="flex flex-col">
-                                    <span className={`text-sm font-bold ${isPaid ? 'text-slate-200' : 'text-slate-500'}`}>{t.description}</span>
+                                    <div className="flex items-center gap-2">
+                                      <span className={`text-sm font-bold ${isPaid ? 'text-slate-200' : 'text-slate-500'}`}>{t.description}</span>
+                                      {t.isPriority && <AlertTriangle size={12} className="text-amber-500" />}
+                                    </div>
                                     <span className="text-[10px] text-slate-500 mt-0.5">{formatDateDisplay(t.date)} • {t.account || 'Carteira'}</span>
                                   </div>
                                   <div className="flex items-center gap-3">
@@ -653,11 +656,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
                           {isTransfer ? <Layers size={18} /> : t.type === 'income' ? <TrendingUp size={18} /> : <TrendingDown size={18} />}
                         </div>
 
-                        <div className="min-w-0">
+                          <div className="min-w-0">
                           <div className="flex items-center gap-3">
                             <p className={`font-bold truncate text-[15px] tracking-tight ${isPaid ? 'text-slate-100' : 'text-slate-500'}`}>
                               {t.description}
                             </p>
+                            {t.isPriority && <AlertTriangle size={14} className="text-amber-500 shrink-0" />}
                             {!isPaid && <Clock size={12} className="text-amber-500 shrink-0" />}
                             {t.isRecurring && (
                               <span className="text-[8px] px-1.5 py-0.5 rounded-sm bg-slate-800 text-slate-500 border border-white/5 font-black uppercase tracking-[0.15em]">Fixo</span>

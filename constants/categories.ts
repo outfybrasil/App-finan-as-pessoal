@@ -10,6 +10,7 @@ export const EXPENSE_CATEGORIES = [
     'Compras',
     'Assinaturas',
     'Viagem',
+    'Poupança',
     'Serviços',
     'Outros'
 ];
