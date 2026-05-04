@@ -142,12 +142,16 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
       setDescription(rawDesc);
       setIsSeries(detectedSeries);
 
+<<<<<<< HEAD
       if (initialData.tags) {
         const reserveTag = initialData.tags.find(t => t.startsWith('#reserva:'));
         if (reserveTag) {
           // Reserve logic could go here if needed
         }
       }
+=======
+
+>>>>>>> 8141379bd7e83a570927f6107badd33263600cd1
 
       if (initialData.splits && initialData.splits.length > 0) {
         setIsSplitMode(true);

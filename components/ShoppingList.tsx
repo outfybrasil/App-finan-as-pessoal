@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingCart, Plus, Trash2, Check, X, Calculator, ShoppingBag, AlertCircle, Save, ArrowRight, CheckCircle2, HelpCircle } from 'lucide-react';
+import { ShoppingCart, Plus, Trash2, Check, X, Calculator, ShoppingBag, AlertCircle, Save, ArrowRight, CheckCircle2, HelpCircle, Edit2 } from 'lucide-react';
 import { Button } from './Button';
 import { CustomDialog } from './CustomDialog';
 import { triggerHaptic } from '../utils/haptics';
@@ -28,6 +28,17 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ onFinishShopping }) 
   const [showSuccess, setShowSuccess] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  
+  // Product Catalog & Autocomplete
+  const [productCatalog, setProductCatalog] = useState<Record<string, number>>(() => {
+    const saved = localStorage.getItem('shopping_product_catalog');
+    return saved ? JSON.parse(saved) : {};
+  });
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  
+  // Inline Price Editing
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editingItemPrice, setEditingItemPrice] = useState<string>('');
 
   useEffect(() => {
     localStorage.setItem('shopping_list_items', JSON.stringify(items));
@@ -67,6 +78,15 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ onFinishShopping }) 
   const totalEstimated = items.reduce((acc, item) => acc + (item.estimatedPrice * item.quantity), 0);
   const completedItems = items.filter(i => i.completed).length;
 
+  const saveEditingPrice = (id: string) => {
+    const val = parseFloat(editingItemPrice.replace(',', '.'));
+    if (!isNaN(val)) {
+      triggerHaptic('light');
+      setItems(items.map(item => item.id === id ? { ...item, estimatedPrice: val } : item));
+    }
+    setEditingItemId(null);
+  };
+
   const handleFinish = () => {
     if (totalEstimated === 0) return;
     triggerHaptic('heavy');
@@ -77,6 +97,14 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ onFinishShopping }) 
       .map(i => i.name)
       .slice(0, 5)
       .join(', ') + (items.length > 5 ? '...' : '');
+
+    // Atualiza o catálogo de produtos com os preços
+    const newCatalog = { ...productCatalog };
+    items.forEach(item => {
+      newCatalog[item.name] = item.estimatedPrice;
+    });
+    setProductCatalog(newCatalog);
+    localStorage.setItem('shopping_product_catalog', JSON.stringify(newCatalog));
 
     onFinishShopping(totalEstimated, itemsSummary);
     
@@ -150,18 +178,46 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ onFinishShopping }) 
             </h3>
 
             <form onSubmit={addItem} className="space-y-8">
-              <div className="space-y-3">
+              <div className="space-y-3 relative">
                 <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] ml-2">O que comprar?</label>
                 <div className="relative">
                   <input
                     type="text"
                     value={newItemName}
-                    onChange={(e) => setNewItemName(e.target.value)}
+                    onChange={(e) => {
+                      setNewItemName(e.target.value);
+                      setShowSuggestions(true);
+                    }}
+                    onFocus={() => setShowSuggestions(true)}
+                    onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
                     placeholder="Ex: Café em pó"
                     className="w-full bg-slate-950/50 border border-white/5 rounded-3xl px-6 py-5 text-white font-bold placeholder:text-slate-700 outline-none focus:border-emerald-500/50 focus:bg-slate-950 transition-all text-lg shadow-inner"
                   />
                   <ShoppingBag className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-800" size={20} />
                 </div>
+                
+                {/* Suggestions Dropdown */}
+                {showSuggestions && Object.keys(productCatalog).filter(k => k.toLowerCase().includes((newItemName || '').toLowerCase())).length > 0 && (
+                  <div className="absolute z-50 left-0 right-0 top-[calc(100%+0.5rem)] bg-slate-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden max-h-48 overflow-y-auto custom-scrollbar">
+                    {Object.keys(productCatalog)
+                      .filter(k => k.toLowerCase().includes((newItemName || '').toLowerCase()))
+                      .map(name => (
+                        <div 
+                          key={name}
+                          className="px-6 py-4 hover:bg-emerald-500/10 cursor-pointer flex justify-between items-center transition-colors border-b border-white/5 last:border-0"
+                          onClick={() => {
+                            setNewItemName(name);
+                            setNewItemPrice(productCatalog[name].toString());
+                            setNewItemQty('1');
+                            setShowSuggestions(false);
+                          }}
+                        >
+                          <span className="font-bold text-slate-200 text-sm tracking-wide">{name}</span>
+                          <span className="text-xs font-black text-emerald-500/70 tracking-widest">R$ {productCatalog[name].toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                      ))}
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-6">
@@ -279,9 +335,40 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ onFinishShopping }) 
 
                       <div className="flex items-center gap-6">
                         <div className="text-right">
-                          <p className={`text-xl font-black transition-all ${item.completed ? 'text-slate-600' : 'text-white'}`}>
-                            R$ {(item.estimatedPrice * item.quantity).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                          </p>
+                          {editingItemId === item.id ? (
+                            <div className="flex items-center gap-2 bg-slate-950/50 p-1.5 rounded-xl border border-emerald-500/50 shadow-inner">
+                              <span className="text-xs text-emerald-500/50 font-black ml-2">R$</span>
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={editingItemPrice}
+                                onChange={(e) => setEditingItemPrice(e.target.value)}
+                                className="w-20 bg-transparent text-right text-emerald-400 font-black outline-none placeholder:text-slate-700"
+                                autoFocus
+                                onBlur={() => saveEditingPrice(item.id)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') saveEditingPrice(item.id);
+                                  if (e.key === 'Escape') setEditingItemId(null);
+                                }}
+                              />
+                            </div>
+                          ) : (
+                            <div 
+                              className="group/price flex items-center gap-2 cursor-pointer transition-transform hover:scale-105 active:scale-95"
+                              onClick={() => {
+                                if(item.completed) return; // Prevent editing if marked as done
+                                setEditingItemId(item.id);
+                                setEditingItemPrice(item.estimatedPrice.toString());
+                              }}
+                            >
+                              <p className={`text-xl font-black transition-all ${item.completed ? 'text-slate-600' : 'text-white'} ${!item.completed && 'group-hover/price:text-emerald-400'}`}>
+                                R$ {(item.estimatedPrice * item.quantity).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </p>
+                              <div className={`p-1.5 rounded-lg transition-colors ${item.completed ? 'text-transparent' : 'text-slate-600 group-hover/price:bg-emerald-500/10 group-hover/price:text-emerald-500'}`}>
+                                <Edit2 size={14} className={item.completed ? 'opacity-0' : 'opacity-0 group-hover/price:opacity-100'} />
+                              </div>
+                            </div>
+                          )}
                         </div>
                         <button
                           onClick={() => removeItem(item.id)}

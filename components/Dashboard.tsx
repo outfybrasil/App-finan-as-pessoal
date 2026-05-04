@@ -161,16 +161,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
     return { name: acc, balance: income - expense };
   }).sort((a, b) => b.balance - a.balance);
 
-  // Saldo Real Acumulado (Total de todas as contas até hoje)
-  const totalRealBalance = allTransactions
-    .filter(checkPaid)
-    .reduce((acc, t) => {
-      const val = Number(t.amount);
-      return t.type === 'income' ? acc + val : acc - val;
-    }, 0);
+  const totalRealBalance = accountBalances.reduce((sum, acc) => sum + acc.balance, 0);
 
-  // Projeção Final (Saldo Hoje + Pendentes do Mês)
-  const finalMonthProjection = totalRealBalance + (pendingIncome - pendingExpense);
+
+
+  // Projeção Final (Fluxo Previsto do Mês = Realizado + Pendente)
+  const finalMonthProjection = projectedBalance;
 
   const totalMonthlyFlow = monthlyBalance;
 
