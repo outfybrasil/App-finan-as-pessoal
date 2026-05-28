@@ -40,10 +40,12 @@ const mapDocumentToAccount = (doc: any): Account => ({
 export const financeService = {
   async getTransactions(): Promise<Transaction[]> {
     try {
+      const user = await account.get();
       const { documents } = await databases.listDocuments(
         APPWRITE_DATABASE_ID,
         TRANSACTIONS_COLLECTION_ID,
         [
+          Query.equal('user_id', user.$id),
           Query.limit(2500) // Increase limit to prevent missing data
         ]
       );
@@ -189,10 +191,14 @@ export const financeService = {
 
   async getBudgets(): Promise<Budget[]> {
     try {
+      const user = await account.get();
       const { documents } = await databases.listDocuments(
         APPWRITE_DATABASE_ID,
         BUDGETS_COLLECTION_ID,
-        [Query.limit(100)]
+        [
+          Query.equal('user_id', user.$id),
+          Query.limit(100)
+        ]
       );
       return documents.map((doc: any) => ({
         id: doc.$id,
@@ -273,10 +279,14 @@ export const financeService = {
 
   async getGoals(): Promise<Goal[]> {
     try {
+      const user = await account.get();
       const { documents } = await databases.listDocuments(
         APPWRITE_DATABASE_ID,
         GOALS_COLLECTION_ID,
-        [Query.limit(100)]
+        [
+          Query.equal('user_id', user.$id),
+          Query.limit(100)
+        ]
       );
       return documents.map((doc: any) => ({
         id: doc.$id,
@@ -364,10 +374,14 @@ export const financeService = {
 
   async getAccounts(): Promise<Account[]> {
     try {
+      const user = await account.get();
       const { documents } = await databases.listDocuments(
         APPWRITE_DATABASE_ID,
         ACCOUNTS_COLLECTION_ID,
-        [Query.limit(100)]
+        [
+          Query.equal('user_id', user.$id),
+          Query.limit(100)
+        ]
       );
       return documents.map(mapDocumentToAccount);
     } catch (error) {
