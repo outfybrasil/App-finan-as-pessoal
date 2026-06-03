@@ -1,11 +1,19 @@
 import { databases, account, APPWRITE_DATABASE_ID } from '../lib/appwrite';
-import { ID, Query } from 'appwrite';
+import { ID, Query, Permission, Role } from 'appwrite';
 import { Transaction, Budget, Goal, Account } from '../types';
 
 const TRANSACTIONS_COLLECTION_ID = import.meta.env.VITE_APPWRITE_TRANSACTIONS_COLLECTION_ID;
 const BUDGETS_COLLECTION_ID = import.meta.env.VITE_APPWRITE_BUDGETS_COLLECTION_ID;
 const GOALS_COLLECTION_ID = import.meta.env.VITE_APPWRITE_GOALS_COLLECTION_ID;
 const ACCOUNTS_COLLECTION_ID = import.meta.env.VITE_APPWRITE_ACCOUNTS_COLLECTION_ID;
+
+function getDocumentPermissions(userId: string): string[] {
+    return [
+        Permission.read(Role.user(userId)),
+        Permission.update(Role.user(userId)),
+        Permission.delete(Role.user(userId))
+    ];
+}
 
 // Helper to map Appwrite document to application object
 const mapDocumentToTransaction = (doc: any): Transaction => ({
@@ -61,6 +69,7 @@ export const financeService = {
       const user = await account.get();
       if (!user) throw new Error('User not authenticated');
 
+      const perms = getDocumentPermissions(user.$id);
       const promises = transactions.map(t =>
         databases.createDocument(
           APPWRITE_DATABASE_ID,
@@ -83,7 +92,8 @@ export const financeService = {
             tags: t.tags || [],
             splits: t.splits ? JSON.stringify(t.splits) : null,
             destination_account: t.destinationAccount || null,
-          }
+          },
+          perms
         )
       );
 
@@ -97,6 +107,8 @@ export const financeService = {
 
   async updateTransaction(id: string, updates: Partial<Transaction>): Promise<Transaction | null> {
     try {
+      await account.get();
+
       // Whitelist: montar payload apenas com campos válidos do Appwrite
       const payload: Record<string, any> = {};
 
@@ -136,6 +148,7 @@ export const financeService = {
 
   async deleteTransaction(id: string): Promise<boolean> {
     try {
+      await account.get();
       await databases.deleteDocument(
         APPWRITE_DATABASE_ID,
         TRANSACTIONS_COLLECTION_ID,
@@ -150,6 +163,7 @@ export const financeService = {
 
   async deleteMultipleTransactions(ids: string[]): Promise<boolean> {
     try {
+      await account.get();
       const promises = ids.map(id =>
         databases.deleteDocument(
           APPWRITE_DATABASE_ID,
@@ -167,6 +181,7 @@ export const financeService = {
 
   async updateMultipleTransactions(ids: string[], updates: Partial<Transaction>): Promise<boolean> {
     try {
+      await account.get();
       const payload: Record<string, any> = {};
       if (updates.category !== undefined) payload.category = updates.category;
       if (updates.type !== undefined) payload.type = updates.type;
@@ -226,7 +241,8 @@ export const financeService = {
           spent: budget.spent,
           cumulative: budget.cumulative || false,
           user_id: user.$id
-        }
+        },
+        getDocumentPermissions(user.$id)
       );
       return {
         id: doc.$id,
@@ -243,6 +259,7 @@ export const financeService = {
 
   async updateBudget(id: string, updates: Partial<Budget>): Promise<Budget | null> {
     try {
+      await account.get();
       const { id: _, ...payload } = updates as any;
       const doc = await databases.updateDocument(
         APPWRITE_DATABASE_ID,
@@ -265,6 +282,7 @@ export const financeService = {
 
   async deleteBudget(id: string): Promise<boolean> {
     try {
+      await account.get();
       await databases.deleteDocument(
         APPWRITE_DATABASE_ID,
         BUDGETS_COLLECTION_ID,
@@ -313,7 +331,8 @@ export const financeService = {
         {
           ...goal,
           user_id: user.$id
-        }
+        },
+        getDocumentPermissions(user.$id)
       );
       return {
         id: doc.$id,
@@ -332,6 +351,7 @@ export const financeService = {
 
   async updateGoal(id: string, updates: Partial<Goal>): Promise<Goal | null> {
     try {
+      await account.get();
       // Remove id from updates if present
       const { id: _, ...payload } = updates as any;
 
@@ -358,6 +378,7 @@ export const financeService = {
 
   async deleteGoal(id: string): Promise<boolean> {
     try {
+      await account.get();
       await databases.deleteDocument(
         APPWRITE_DATABASE_ID,
         GOALS_COLLECTION_ID,
@@ -405,7 +426,8 @@ export const financeService = {
           closing_day: newAccount.closingDay,
           due_day: newAccount.dueDay,
           user_id: user.$id
-        }
+        },
+        getDocumentPermissions(user.$id)
       );
       return mapDocumentToAccount(doc);
     } catch (error) {
@@ -416,6 +438,7 @@ export const financeService = {
 
   async updateAccount(id: string, updates: Partial<Account>): Promise<Account | null> {
     try {
+      await account.get();
       const payload: any = { ...updates };
       if (updates.creditLimit !== undefined) payload.credit_limit = updates.creditLimit;
       if (updates.closingDay !== undefined) payload.closing_day = updates.closingDay;
@@ -441,6 +464,7 @@ export const financeService = {
 
   async deleteAccount(id: string): Promise<boolean> {
     try {
+      await account.get();
       await databases.deleteDocument(
         APPWRITE_DATABASE_ID,
         ACCOUNTS_COLLECTION_ID,

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { financeService } from '../services/financeService';
 import { Transaction, Budget, Goal, TransactionType, Account } from '../types';
 
@@ -9,8 +9,13 @@ export const useFinance = (userId: string | undefined) => {
     const [accounts, setAccounts] = useState<Account[]>([]);
     const [loading, setLoading] = useState(true);
 
+    const latestUserId = useRef(userId);
+    const fetchId = useRef(0);
+
     const refreshData = useCallback(async () => {
         if (!userId) return;
+        const currentFetchId = ++fetchId.current;
+        latestUserId.current = userId;
         setLoading(true);
         try {
             const [fetchedTransactions, fetchedBudgets, fetchedGoals, fetchedAccounts] = await Promise.all([
@@ -19,20 +24,34 @@ export const useFinance = (userId: string | undefined) => {
                 financeService.getGoals(),
                 financeService.getAccounts()
             ]);
-            setTransactions(fetchedTransactions);
-            setBudgets(fetchedBudgets);
-            setGoals(fetchedGoals);
-            setAccounts(fetchedAccounts);
+            if (currentFetchId === fetchId.current) {
+                setTransactions(fetchedTransactions);
+                setBudgets(fetchedBudgets);
+                setGoals(fetchedGoals);
+                setAccounts(fetchedAccounts);
+            }
         } catch (error) {
             console.error("Failed to load data", error);
         } finally {
-            setLoading(false);
+            if (currentFetchId === fetchId.current) {
+                setLoading(false);
+            }
         }
     }, [userId]);
 
     useEffect(() => {
-        refreshData();
-    }, [refreshData]);
+        latestUserId.current = userId;
+
+        if (userId) {
+            refreshData();
+        } else {
+            setTransactions([]);
+            setBudgets([]);
+            setGoals([]);
+            setAccounts([]);
+            setLoading(false);
+        }
+    }, [userId, refreshData]);
 
     const addTransaction = async (data: any) => {
         const result = await financeService.addTransaction(data);
@@ -136,7 +155,6 @@ export const useFinance = (userId: string | undefined) => {
         accounts,
         addAccount,
         updateAccount,
-        deleteAccount,
         deleteAccount,
         deleteMultipleTransactions: financeService.deleteMultipleTransactions,
         recategorizeTransactions: async (oldCategory: string, type: TransactionType, newCategory: string) => {

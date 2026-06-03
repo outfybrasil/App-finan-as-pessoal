@@ -13,6 +13,8 @@ const client = new Client()
 
 const databases = new Databases(client);
 
+const COLLECTION_PERMISSIONS = [Permission.create(Role.users())];
+
 async function getOrCreateCollection(dbId, name) {
     console.log(`\n🔍 Verificando coleção: ${name}...`);
     try {
@@ -21,6 +23,13 @@ async function getOrCreateCollection(dbId, name) {
 
         if (existing) {
             console.log(`✅ Coleção '${name}' já existe. ID: ${existing.$id}`);
+            // Atualiza permissões da coleção existente para restringir a apenas create
+            try {
+                await databases.updateCollection(dbId, existing.$id, name, COLLECTION_PERMISSIONS);
+                console.log(`   🔒 Permissões da coleção atualizadas: apenas create para usuários autenticados`);
+            } catch (permErr) {
+                console.error(`   ⚠️ Erro ao atualizar permissões da coleção: ${permErr.message}`);
+            }
             return existing.$id;
         }
 
@@ -28,9 +37,9 @@ async function getOrCreateCollection(dbId, name) {
         console.log(`📦 Criando coleção '${name}'...`);
         const newCollection = await databases.createCollection(
             dbId,
-            'unique()', // ID único gerado automaticamente, ou poderia ser o nome se validado
+            'unique()',
             name,
-            [Permission.create(Role.users()), Permission.read(Role.users()), Permission.update(Role.users()), Permission.delete(Role.users())]
+            COLLECTION_PERMISSIONS
         );
         console.log(`✅ Coleção '${name}' criada. ID: ${newCollection.$id}`);
         return newCollection.$id;
