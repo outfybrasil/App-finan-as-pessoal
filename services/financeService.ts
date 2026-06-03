@@ -1,18 +1,11 @@
 import { databases, account, APPWRITE_DATABASE_ID } from '../lib/appwrite';
-import { ID, Query, Permission, Role } from 'appwrite';
+import { ID, Query } from 'appwrite';
 import { Transaction, Budget, Goal, Account } from '../types';
 
 const TRANSACTIONS_COLLECTION_ID = import.meta.env.VITE_APPWRITE_TRANSACTIONS_COLLECTION_ID;
 const BUDGETS_COLLECTION_ID = import.meta.env.VITE_APPWRITE_BUDGETS_COLLECTION_ID;
 const GOALS_COLLECTION_ID = import.meta.env.VITE_APPWRITE_GOALS_COLLECTION_ID;
 const ACCOUNTS_COLLECTION_ID = import.meta.env.VITE_APPWRITE_ACCOUNTS_COLLECTION_ID;
-
-function getDocumentPermissions(userId: string): string[] {
-    return [
-        Permission.update(Role.user(userId)),
-        Permission.delete(Role.user(userId))
-    ];
-}
 
 // Helper to map Appwrite document to application object
 const mapDocumentToTransaction = (doc: any): Transaction => ({
@@ -68,7 +61,6 @@ export const financeService = {
       const user = await account.get();
       if (!user) throw new Error('User not authenticated');
 
-      const perms = getDocumentPermissions(user.$id);
       const promises = transactions.map(t =>
         databases.createDocument(
           APPWRITE_DATABASE_ID,
@@ -91,8 +83,7 @@ export const financeService = {
             tags: t.tags || [],
             splits: t.splits ? JSON.stringify(t.splits) : null,
             destination_account: t.destinationAccount || null,
-          },
-          perms
+          }
         )
       );
 
@@ -240,8 +231,7 @@ export const financeService = {
           spent: budget.spent,
           cumulative: budget.cumulative || false,
           user_id: user.$id
-        },
-        getDocumentPermissions(user.$id)
+        }
       );
       return {
         id: doc.$id,
@@ -330,8 +320,7 @@ export const financeService = {
         {
           ...goal,
           user_id: user.$id
-        },
-        getDocumentPermissions(user.$id)
+        }
       );
       return {
         id: doc.$id,
@@ -425,8 +414,7 @@ export const financeService = {
           closing_day: newAccount.closingDay,
           due_day: newAccount.dueDay,
           user_id: user.$id
-        },
-        getDocumentPermissions(user.$id)
+        }
       );
       return mapDocumentToAccount(doc);
     } catch (error) {
