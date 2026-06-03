@@ -51,7 +51,6 @@ async function migrateCollection(displayName, collectionId) {
             }
 
             const perms = [
-                Permission.read(Role.user(userId)),
                 Permission.update(Role.user(userId)),
                 Permission.delete(Role.user(userId)),
             ];

@@ -9,7 +9,6 @@ const ACCOUNTS_COLLECTION_ID = import.meta.env.VITE_APPWRITE_ACCOUNTS_COLLECTION
 
 function getDocumentPermissions(userId: string): string[] {
     return [
-        Permission.read(Role.user(userId)),
         Permission.update(Role.user(userId)),
         Permission.delete(Role.user(userId))
     ];

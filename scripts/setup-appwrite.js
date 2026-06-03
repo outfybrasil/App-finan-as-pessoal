@@ -13,7 +13,7 @@ const client = new Client()
 
 const databases = new Databases(client);
 
-const COLLECTION_PERMISSIONS = [Permission.create(Role.users())];
+const COLLECTION_PERMISSIONS = [Permission.create(Role.users()), Permission.read(Role.users())];
 
 async function getOrCreateCollection(dbId, name) {
     console.log(`\n🔍 Verificando coleção: ${name}...`);
@@ -26,7 +26,7 @@ async function getOrCreateCollection(dbId, name) {
             // Atualiza permissões da coleção existente para restringir a apenas create
             try {
                 await databases.updateCollection(dbId, existing.$id, name, COLLECTION_PERMISSIONS);
-                console.log(`   🔒 Permissões da coleção atualizadas: apenas create para usuários autenticados`);
+                console.log(`   🔒 Permissões da coleção atualizadas: create + read para usuários autenticados`);
             } catch (permErr) {
                 console.error(`   ⚠️ Erro ao atualizar permissões da coleção: ${permErr.message}`);
             }
