@@ -267,7 +267,7 @@ const App: React.FC = () => {
       true,
       undefined,
       undefined,
-      false
+      undefined
     );
   };
 
@@ -495,8 +495,8 @@ const App: React.FC = () => {
         <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col md:flex-row font-sans overflow-x-hidden">
 
         {/* Desktop Sidebar */}
-        <aside className="hidden md:flex flex-col w-72 border-r border-white/5 bg-zinc-950 p-6 fixed h-full z-20">
-          <div className="flex items-center gap-3 mb-10 px-2">
+        <aside className="hidden md:flex flex-col w-72 border-r border-white/5 bg-zinc-950 p-6 fixed h-full z-20 overflow-y-auto custom-scrollbar">
+          <div className="flex items-center gap-3 mb-8 px-2 shrink-0">
             <div className="w-10 h-10 bg-zinc-900 border border-white/10 rounded-lg flex items-center justify-center">
               <Wallet size={20} className="text-emerald-500" />
             </div>
@@ -504,6 +504,16 @@ const App: React.FC = () => {
               <span className="font-bold text-lg tracking-tight text-zinc-100 leading-none">Fluxo</span>
               <span className="text-[10px] text-zinc-500 uppercase tracking-widest mt-1">App</span>
             </div>
+          </div>
+
+          <div className="mb-6 px-2 shrink-0">
+            <button
+              onClick={() => { setTransactionToEdit(null); setShowQuickAdd(true); }}
+              className="bg-emerald-500 text-zinc-950 rounded-2xl h-12 w-full flex items-center justify-center gap-2 font-bold text-sm transition-all duration-300 hover:bg-emerald-400 active:scale-95 shadow-[0_0_20px_rgba(52,211,153,0.15)] hover:shadow-[0_0_25px_rgba(52,211,153,0.3)]"
+            >
+              <Plus size={18} className="stroke-[2.5]" />
+              Registrar
+            </button>
           </div>
 
           <nav className="space-y-2 flex-1">
@@ -546,15 +556,7 @@ const App: React.FC = () => {
               <span className="text-sm font-bold">Sair da Conta</span>
             </button>
 
-            <div className="pt-4">
-              <button
-                onClick={() => { setTransactionToEdit(null); setShowQuickAdd(true); }}
-                className="bg-emerald-500 text-zinc-950 rounded-lg h-12 w-full flex items-center justify-center gap-2 font-bold text-sm transition-colors hover:bg-emerald-400 active:scale-95"
-              >
-                <Plus size={18} className="stroke-[2.5]" />
-                Registrar
-              </button>
-            </div>
+
 
             {deferredPrompt && (
               <button

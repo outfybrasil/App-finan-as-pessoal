@@ -230,7 +230,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     return acc;
   }, {} as Record<string, Transaction[]>);
 
-  const categoryGroups = Object.entries(groupedTransactions).sort((a, b) => {
+  const categoryGroups = (Object.entries(groupedTransactions) as [string, Transaction[]][]).sort((a, b) => {
     return a[0].localeCompare(b[0]);
   });
 
