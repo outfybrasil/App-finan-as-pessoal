@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useTravelMode } from '../context/TravelContext';
 import { Transaction, TransactionType } from '../types';
-import { TrendingUp, TrendingDown, FileText, X, CalendarClock, Trash2, Layers, Info, CheckCircle2, Clock, CreditCard, Plus, Minus, Calculator, ChevronRight, ArrowDownCircle, ArrowUpCircle, PiggyBank, Save, AlertTriangle } from 'lucide-react';
+import { TrendingUp, TrendingDown, FileText, X, CalendarClock, Trash2, Layers, Info, CheckCircle2, Clock, CreditCard, Plus, Minus, Calculator, ChevronRight, ArrowDownCircle, ArrowUpCircle, PiggyBank, Save, AlertTriangle, CalendarRange } from 'lucide-react';
 import { CustomDialog } from './CustomDialog';
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, ACCOUNT_OPTIONS } from '../constants/categories';
 import { useCategories } from '../context/CategoryContext';
@@ -74,6 +74,9 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
   const [showCustomCategoryInput, setShowCustomCategoryInput] = useState(false);
   const [showDeleteCategoryConfirm, setShowDeleteCategoryConfirm] = useState(false);
   const [categoryToDelete, setCategoryToDelete] = useState('');
+  const [showSeriesSaveDialog, setShowSeriesSaveDialog] = useState(false);
+  const seriesPayloadRef = useRef<any>(null);
+  const [seriesLoading, setSeriesLoading] = useState(false);
 
   useEffect(() => {
     if (isTravelModeActive && !initialData && !isEditing) {
@@ -219,11 +222,16 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
     };
 
     if (isEditing && onEdit) {
-      const success = await onEdit(initialData!.id, payload, updateSeries);
+      if (isSeries) {
+        seriesPayloadRef.current = payload;
+        setShowSeriesSaveDialog(true);
+        return;
+      }
+      const success = await onEdit(initialData!.id, payload, false);
       if (success === false) {
         setAlertMessage("Erro ao salvar as alterações. Verifique sua conexão ou campos obrigatórios.");
         setShowAlertDialog(true);
-        return; // Não fecha o modal se falhar
+        return;
       }
     } else {
       onAdd(
@@ -787,6 +795,111 @@ export const QuickAdd: React.FC<QuickAddProps> = ({
           </form>
         </div>
       </div>
+
+      {showSeriesSaveDialog && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-slate-900 border-2 border-slate-800 rounded-sm w-full max-w-sm shadow-[20px_20px_0px_0px_rgba(0,0,0,0.3)] overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="h-1 w-full bg-amber-500" />
+            <div className="p-8">
+              <div className="flex items-start gap-5 mb-8">
+                <div className="p-3 rounded-sm bg-amber-500/10 border border-amber-500/30">
+                  <Layers size={24} className="text-amber-400" />
+                </div>
+                <div className="flex-1 pt-1">
+                  <h3 className="text-lg font-black text-white uppercase tracking-tighter leading-none mb-3">
+                    Série de Lançamentos
+                  </h3>
+                  <p className="text-slate-400 text-sm font-medium leading-relaxed">
+                    Esta movimentação faz parte de uma série. Como deseja salvar as alterações?
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-3">
+                <button
+                  onClick={async () => {
+                    setSeriesLoading(true);
+                    const p = seriesPayloadRef.current;
+                    if (p) {
+                      const ok = await onEdit!(initialData!.id, p, false);
+                      if (ok === false) {
+                        setAlertMessage("Erro ao salvar as alterações.");
+                        setShowAlertDialog(true);
+                      } else {
+                        onClose();
+                      }
+                    }
+                    setSeriesLoading(false);
+                    setShowSeriesSaveDialog(false);
+                  }}
+                  disabled={seriesLoading}
+                  className="w-full flex items-center justify-between p-4 bg-white/5 hover:bg-white/10 border border-white/5 rounded-sm transition-all group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-emerald-500/10 text-emerald-500 rounded-sm">
+                      <FileText size={20} />
+                    </div>
+                    <div className="text-left">
+                      <p className="font-bold text-slate-100">Salvar apenas este</p>
+                      <p className="text-[10px] text-slate-500 uppercase tracking-widest font-black">Altera somente este lançamento</p>
+                    </div>
+                  </div>
+                  <ChevronRight size={18} className="text-slate-600 group-hover:text-slate-300 transition-all" />
+                </button>
+                <button
+                  onClick={async () => {
+                    setSeriesLoading(true);
+                    const p = seriesPayloadRef.current;
+                    if (p) {
+                      const ok = await onEdit!(initialData!.id, p, true);
+                      if (ok === false) {
+                        setAlertMessage("Erro ao salvar as alterações.");
+                        setShowAlertDialog(true);
+                      } else {
+                        onClose();
+                      }
+                    }
+                    setSeriesLoading(false);
+                    setShowSeriesSaveDialog(false);
+                  }}
+                  disabled={seriesLoading}
+                  className="w-full flex items-center justify-between p-4 bg-amber-500/5 hover:bg-amber-500/10 border border-amber-500/10 rounded-sm transition-all group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-amber-500/10 text-amber-500 rounded-sm">
+                      <CalendarRange size={20} />
+                    </div>
+                    <div className="text-left">
+                      <p className="font-bold text-slate-100">Salvar este e os próximos</p>
+                      <p className="text-[10px] text-amber-500/80 uppercase tracking-widest font-black">Aplica a alteração em todos da série</p>
+                    </div>
+                  </div>
+                  <ChevronRight size={18} className="text-amber-500/40 group-hover:text-amber-400 transition-all" />
+                </button>
+              </div>
+              {seriesLoading && (
+                <div className="mt-4 text-center text-[10px] text-slate-500 font-black uppercase tracking-widest animate-pulse">
+                  Salvando...
+                </div>
+              )}
+              <button
+                onClick={() => { setShowSeriesSaveDialog(false); seriesPayloadRef.current = null; }}
+                disabled={seriesLoading}
+                className="w-full mt-6 py-4 text-xs font-black uppercase tracking-[0.2em] text-slate-500 hover:text-slate-300 transition-all"
+              >
+                Cancelar
+              </button>
+            </div>
+            <div className="px-8 py-3 bg-slate-950/50 border-t border-slate-800/50 flex justify-between items-center">
+              <span className="text-[9px] font-mono text-slate-600 uppercase tracking-widest">System.Dialog.v1</span>
+              <div className="flex gap-1">
+                <div className="w-1 h-1 bg-slate-700" />
+                <div className="w-1 h-1 bg-slate-800" />
+                <div className="w-1 h-1 bg-slate-900" />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <CustomDialog
         isOpen={showDeleteConfirm}
