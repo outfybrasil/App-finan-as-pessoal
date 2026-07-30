@@ -1,0 +1,37 @@
+--- src/store.ts
++++ src/store.ts
+@@ -31,7 +31,7 @@
+   
+   // Transaction actions
+   addTransaction: (data: Omit<Transaction, 'id'> & { totalInstallments?: number }) => void;
+-  payTransaction: (id: string, accountId: string, amountPaid: number, paymentDate: string) => void;
++  payTransaction: (id: string, accountId: string, amountPaid: number, paymentDate: string, intendedStatus?: 'completed' | 'scheduled') => void;
+   deleteTransaction: (id: string, deleteOption?: 'only-this' | 'this-and-future' | 'all-group') => void;
+   editTransaction: (transaction: Transaction, editOption?: 'only-this' | 'this-and-future' | 'all-group') => void;
+   
+@@ -754,7 +754,7 @@
+       },
+       
+-      payTransaction: (id, accountId, amountPaid, paymentDate) => {
++      payTransaction: (id, accountId, amountPaid, paymentDate, intendedStatus = 'completed') => {
+         let updatedAccounts: Account[] = [];
+         let toUpdate: Transaction[] = [];
+         let toAdd: Transaction | null = null;
+@@ -778,7 +778,7 @@
+               amount: amountPaid,
+               accountId,
+               date: paymentDate,
+-              status: 'completed',
++              status: intendedStatus,
+               isInstallment: false // keep it false so it doesn't duplicate installment grouping logic badly, or keep original groupId to show in timeline
+             };
+             
+@@ -802,7 +802,7 @@
+               description: original.description,
+               amount: amountPaid,
+               accountId,
+-              status: 'completed',
++              status: intendedStatus,
+               date: paymentDate
+             });
+           }

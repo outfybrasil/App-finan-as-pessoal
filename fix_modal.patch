@@ -1,0 +1,66 @@
+--- src/components/SelectAccountModal.tsx
++++ src/components/SelectAccountModal.tsx
+@@ -7,7 +7,7 @@
+   isOpen: boolean;
+   transaction: Transaction | null;
+   onClose: () => void;
+-  onConfirm: (data: { accountId: string, amountPaid: number, paymentDate: string }) => void;
++  onConfirm: (data: { accountId: string, amountPaid: number, paymentDate: string, intendedStatus?: 'completed' | 'scheduled' }) => void;
+ }
+ 
+ export default function SelectAccountModal({ isOpen, transaction, onClose, onConfirm }: Props) {
+@@ -92,19 +92,34 @@
+           </div>
+         </div>
+ 
+-        <button
+-          onClick={() => {
+-            if (selected && amountPaid && paymentDate) {
+-              onConfirm({
+-                accountId: selected,
+-                amountPaid: Number(amountPaid),
+-                paymentDate: paymentDate
+-              });
+-            }
+-          }}
+-          disabled={!selected || !amountPaid || !paymentDate}
+-          className="w-full py-4 bg-emerald-accent text-black rounded-2xl font-bold font-display disabled:opacity-50 transition shrink-0"
+-        >
+-          CONFIRMAR
+-        </button>
++        <div className="flex gap-2">
++          <button
++            onClick={() => {
++              if (selected && amountPaid && paymentDate) {
++                onConfirm({
++                  accountId: selected,
++                  amountPaid: Number(amountPaid),
++                  paymentDate: paymentDate,
++                  intendedStatus: 'scheduled'
++                });
++              }
++            }}
++            disabled={!selected || !amountPaid || !paymentDate}
++            className="flex-1 py-4 bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 rounded-2xl font-bold font-display disabled:opacity-50 transition shrink-0"
++          >
++            AGENDAR
++          </button>
++          <button
++            onClick={() => {
++              if (selected && amountPaid && paymentDate) {
++                onConfirm({
++                  accountId: selected,
++                  amountPaid: Number(amountPaid),
++                  paymentDate: paymentDate,
++                  intendedStatus: 'completed'
++                });
++              }
++            }}
++            disabled={!selected || !amountPaid || !paymentDate}
++            className="flex-1 py-4 bg-emerald-accent text-black rounded-2xl font-bold font-display disabled:opacity-50 transition shrink-0"
++          >
++            CONFIRMAR
++          </button>
++        </div>
+       </div>
+     </div>

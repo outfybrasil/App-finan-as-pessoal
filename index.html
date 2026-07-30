@@ -1,34 +1,18 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<!-- Deployment Trigger -->
-
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#0e0e10" />
-  <meta name="description" content="Fluxo - Seu controle financeiro pessoal premium e simplificado." />
-
-  <!-- Google Fonts: Manrope (headlines) + Inter (body) -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
-
-  <title>Fluxo | Finanças Pessoais</title>
-  <style>
-    /* Monolith Slate Scrollbar */
-    ::-webkit-scrollbar        { width: 4px; height: 4px; }
-    ::-webkit-scrollbar-track  { background: transparent; }
-    ::-webkit-scrollbar-thumb  { background: rgba(71,71,78,0.4); border-radius: 0; }
-    ::-webkit-scrollbar-thumb:hover { background: rgba(71,71,78,0.7); }
-
-    /* Prevent FOUC */
-    html { background: #0e0e10; }
-  </style>
-</head>
-
-<body class="antialiased selection:bg-[#4edea3] selection:text-[#004a31]">
-  <div id="root"></div>
-  <script type="module" src="/index.tsx"></script>
-</body>
-
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0f172a" />
+    <link rel="icon" type="image/svg+xml" href="/new-favicon.svg?v=6" />
+    <link rel="apple-touch-icon" href="/app-touch-icon-v2.png?v=6" />
+    <link rel="manifest" href="/manifest.json?v=6" />
+    <title>Minhas Finanças</title>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
 </html>
+

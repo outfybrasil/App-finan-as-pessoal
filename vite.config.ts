@@ -1,61 +1,22 @@
-import { defineConfig, loadEnv } from 'vite';
+import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
-import { VitePWA } from 'vite-plugin-pwa';
-import tailwindcss from 'tailwindcss';
-import autoprefixer from 'autoprefixer';
+import path from 'path';
+import {defineConfig} from 'vite';
 
-export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, '.', '');
+export default defineConfig(() => {
   return {
-    server: {
-      port: 3000,
-      host: '0.0.0.0',
-    },
-    base: '/App-finan-as-pessoal/',
-    css: {
-      postcss: {
-        plugins: [
-          tailwindcss,
-          autoprefixer,
-        ],
+    plugins: [react(), tailwindcss()],
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, '.'),
       },
     },
-    plugins: [
-      react(),
-      VitePWA({
-        registerType: 'autoUpdate',
-        includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
-        manifest: {
-          name: 'Minhas Finanças',
-          short_name: 'Minhas Finanças',
-          description: 'Gerenciador Financeiro Pessoal',
-          theme_color: '#0f172a',
-          background_color: '#0f172a',
-          display: 'standalone',
-          icons: [
-            {
-              src: 'pwa-192x192.png',
-              sizes: '192x192',
-              type: 'image/png'
-            },
-            {
-              src: 'pwa-512x512.png',
-              sizes: '512x512',
-              type: 'image/png'
-            }
-          ]
-        }
-      })
-    ],
-    define: {
-      'process.env.API_KEY': JSON.stringify(process.env.GEMINI_API_KEY || env.GEMINI_API_KEY || ''),
-      'import.meta.env.VITE_APPWRITE_ENDPOINT': JSON.stringify(process.env.VITE_APPWRITE_ENDPOINT || env.VITE_APPWRITE_ENDPOINT || 'https://cloud.appwrite.io/v1'),
-      'import.meta.env.VITE_APPWRITE_PROJECT_ID': JSON.stringify(process.env.VITE_APPWRITE_PROJECT_ID || env.VITE_APPWRITE_PROJECT_ID || ''),
-      'import.meta.env.VITE_APPWRITE_DATABASE_ID': JSON.stringify(process.env.VITE_APPWRITE_DATABASE_ID || env.VITE_APPWRITE_DATABASE_ID || ''),
-      'import.meta.env.VITE_APPWRITE_TRANSACTIONS_COLLECTION_ID': JSON.stringify(process.env.VITE_APPWRITE_TRANSACTIONS_COLLECTION_ID || env.VITE_APPWRITE_TRANSACTIONS_COLLECTION_ID || ''),
-      'import.meta.env.VITE_APPWRITE_ACCOUNTS_COLLECTION_ID': JSON.stringify(process.env.VITE_APPWRITE_ACCOUNTS_COLLECTION_ID || env.VITE_APPWRITE_ACCOUNTS_COLLECTION_ID || ''),
-      'import.meta.env.VITE_APPWRITE_BUDGETS_COLLECTION_ID': JSON.stringify(process.env.VITE_APPWRITE_BUDGETS_COLLECTION_ID || env.VITE_APPWRITE_BUDGETS_COLLECTION_ID || ''),
-      'import.meta.env.VITE_APPWRITE_GOALS_COLLECTION_ID': JSON.stringify(process.env.VITE_APPWRITE_GOALS_COLLECTION_ID || env.VITE_APPWRITE_GOALS_COLLECTION_ID || ''),
+    server: {
+      // HMR is disabled in AI Studio via DISABLE_HMR env var.
+      // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
+      hmr: process.env.DISABLE_HMR !== 'true',
+      // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
+      watch: process.env.DISABLE_HMR === 'true' ? null : {},
     },
   };
 });

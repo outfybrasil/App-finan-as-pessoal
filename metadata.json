@@ -1,5 +1,6 @@
 {
   "name": "Minhas finanças",
-  "description": "Aplicativo de gestão financeira pessoal inteligente focado em insights, controle de orçamento e facilidade de registro.",
-  "requestFramePermissions": []
+  "description": "Gerenciador financeiro pessoal completo com controle de gastos, parcelamentos, poupança CDI, calendário, relatórios e lista de mercado inteligente em Premium Dark Mode.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

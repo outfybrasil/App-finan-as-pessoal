@@ -1,0 +1,25 @@
+--- src/store.ts
++++ src/store.ts
+@@ -879,15 +879,21 @@
+             groupTx.forEach(t => {
+               if (editOption === 'all-group' || (editOption === 'this-and-future' && t.installmentInfo!.current > currNum)) {
+-                // Update fields but keep original date and status
++                // Shift the date's day to match the updated one, but keep the month/year of the installment
++                const prevTxDate = new Date(t.date + 'T12:00:00');
++                const updatedDateObj = new Date(updated.date + 'T12:00:00');
++                if (prevTxDate.getDate() !== updatedDateObj.getDate()) {
++                  prevTxDate.setDate(updatedDateObj.getDate());
++                }
++                const newDateStr = prevTxDate.toISOString().split('T')[0];
++
+                 toUpdate.push({
+                   ...t,
+                   description: updated.description,
+                   amount: updated.amount,
+                   type: updated.type,
+                   category: updated.category,
+                   accountId: updated.accountId,
++                  status: updated.status !== 'completed' ? updated.status : t.status,
++                  date: newDateStr
+                 });
+               }
