@@ -1,8 +1,8 @@
 import { PushNotificationSettings } from "./PushNotificationSettings";
-import { useState, FormEvent } from 'react';
+import { useState, FormEvent, ChangeEvent } from 'react';
 import { useFinanceStore } from '../store';
-import { Plus, Trash2, ShieldCheck, Tag, Info, Layers, Cloud, CloudOff, Database, RefreshCw, AlertCircle, CreditCard, ChevronDown, ChevronUp, Settings, LogOut } from 'lucide-react';
-import { TransactionType } from '../types';
+import { Plus, Trash2, ShieldCheck, Tag, Info, Layers, Cloud, CloudOff, Database, RefreshCw, AlertCircle, CreditCard, ChevronDown, ChevronUp, Settings, LogOut, Edit3, Save, X } from 'lucide-react';
+import { Account, TransactionType } from '../types';
 import { saveSupabaseConfig as updateSupabaseConfig, getSupabaseConfig, isSupabaseConfigured, initSupabase } from '../lib/supabase';
 
 const BANK_OPTIONS = [
@@ -20,7 +20,7 @@ const BANK_OPTIONS = [
 ];
 
 export default function SettingsView() {
-  const { categories, transactions, accounts, addCategory, deleteCategory, addAccount, deleteAccount, supabaseStatus, isSyncing, syncWithSupabase, user, logoutUser } = useFinanceStore();
+  const { categories, transactions, accounts, addCategory, deleteCategory, addAccount, deleteAccount, editAccount, supabaseStatus, isSyncing, syncWithSupabase, user, logoutUser } = useFinanceStore();
   const [activeType, setActiveType] = useState<TransactionType>('expense');
   const [newCatName, setNewCatName] = useState('');
 
@@ -33,6 +33,9 @@ export default function SettingsView() {
   const [newAccCreditLimit, setNewAccCreditLimit] = useState('');
   const [newAccClosingDay, setNewAccClosingDay] = useState('');
   const [newAccDueDay, setNewAccDueDay] = useState('');
+  const [newAccPaymentAccountId, setNewAccPaymentAccountId] = useState('');
+  const [newAccMinimumRate, setNewAccMinimumRate] = useState('15');
+  const [editingCard, setEditingCard] = useState<Account | null>(null);
 
   // Supabase configuration states
   const currentSupabaseConfig = getSupabaseConfig();
@@ -74,9 +77,8 @@ export default function SettingsView() {
   const handleDelete = (id: string, name: string) => {
     const count = getTransactionCount(name, activeType);
     if (count > 0) {
-      if (!confirm(`A categoria "${name}" possui ${count} lançamentos vinculados. Se deletar, as transações continuarão gravadas com esse nome, mas a categoria não aparecerá mais nos seletores. Deseja prosseguir?`)) {
-        return;
-      }
+      alert(`A categoria "${name}" não pode ser excluída: existem ${count} lançamentos vinculados. Reatribua-os primeiro.`);
+      return;
     } else {
       if (!confirm(`Deseja realmente deletar a categoria "${name}"?`)) {
         return;
@@ -88,9 +90,8 @@ export default function SettingsView() {
   const handleDeleteAccount = (id: string, name: string) => {
     const accountTrans = transactions.filter(t => t.accountId === id);
     if (accountTrans.length > 0) {
-      if (!confirm(`A conta "${name}" possui ${accountTrans.length} lançamentos vinculados. Deseja realmente excluir esta conta?`)) {
-        return;
-      }
+      alert(`A conta "${name}" não pode ser excluída: existem ${accountTrans.length} lançamentos vinculados. Reatribua-os primeiro.`);
+      return;
     } else {
       if (!confirm(`Deseja realmente excluir a conta "${name}"?`)) {
         return;
@@ -117,10 +118,16 @@ export default function SettingsView() {
 
     const extra: any = {};
     if (newAccType === 'credit') {
+      if (!newAccClosingDay || !newAccDueDay) {
+        alert('Informe fechamento e vencimento do cartão.');
+        return;
+      }
       extra.bank = newAccBank;
       if (newAccCreditLimit) extra.creditLimit = parseFloat(newAccCreditLimit.replace(/\./g, '').replace(',', '.'));
       if (newAccClosingDay) extra.closingDay = parseInt(newAccClosingDay);
       if (newAccDueDay) extra.dueDay = parseInt(newAccDueDay);
+      if (newAccPaymentAccountId) extra.paymentAccountId = newAccPaymentAccountId;
+      extra.minimumPaymentRate = Math.min(100, Math.max(0, Number(newAccMinimumRate) || 15)) / 100;
     } else {
       extra.bank = newAccBank;
     }
@@ -134,6 +141,18 @@ export default function SettingsView() {
     setNewAccCreditLimit('');
     setNewAccClosingDay('');
     setNewAccDueDay('');
+    setNewAccPaymentAccountId('');
+    setNewAccMinimumRate('15');
+  };
+
+  const saveCardSettings = () => {
+    if (!editingCard) return;
+    if (!editingCard.closingDay || !editingCard.dueDay || editingCard.closingDay < 1 || editingCard.closingDay > 31 || editingCard.dueDay < 1 || editingCard.dueDay > 31) {
+      alert('Fechamento e vencimento devem estar entre 1 e 31.');
+      return;
+    }
+    editAccount(editingCard);
+    setEditingCard(null);
   };
 
   const handleSaveSupabaseConfig = async (e: FormEvent) => {
@@ -174,6 +193,27 @@ export default function SettingsView() {
 
   // Filtered categories to render
   const filteredCategories = categories.filter(c => c.type === activeType);
+
+  const exportBackup = () => {
+    const state = useFinanceStore.getState();
+    const payload = { version: 1, exportedAt: new Date().toISOString(), transactions: state.transactions, accounts: state.accounts, categories: state.categories, marketItems: state.marketItems, savingsGoals: state.savingsGoals, categoryBudgets: state.categoryBudgets };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob); link.download = `minhas-financas-backup-${new Date().toISOString().slice(0, 10)}.json`; link.click(); URL.revokeObjectURL(link.href);
+  };
+
+  const importBackup = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const data = JSON.parse(await file.text());
+      if (data.version !== 1 || !Array.isArray(data.transactions) || !Array.isArray(data.accounts) || !Array.isArray(data.categories)) throw new Error('Formato inválido');
+      if (!confirm('Substituir os dados locais pelos dados deste backup?')) return;
+      useFinanceStore.setState({ transactions: data.transactions, accounts: data.accounts, categories: data.categories, marketItems: data.marketItems || [], savingsGoals: data.savingsGoals || [], categoryBudgets: data.categoryBudgets || {} });
+      alert('Backup importado com sucesso.');
+    } catch { alert('Não foi possível importar: o arquivo não é um backup válido.'); }
+    finally { event.target.value = ''; }
+  };
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-24">
@@ -232,6 +272,10 @@ export default function SettingsView() {
           )}
         </div>
       )}
+
+      <section className="glass-card rounded-[24px] p-5" aria-labelledby="data-sync-title">
+        <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 id="data-sync-title" className="text-sm font-bold text-white">Dados e sincronização</h2><p className="mt-1 text-xs text-zinc-400">Estado: {supabaseStatus === 'connected' ? 'conectado' : supabaseStatus === 'error' ? 'erro de sincronização' : 'somente neste dispositivo'}{isSyncing ? ' · sincronizando…' : ''}</p></div><div className="flex gap-2"><button type="button" onClick={exportBackup} className="min-h-11 rounded-xl border border-white/[0.1] px-4 text-xs font-semibold text-white">Exportar backup</button><label className="flex min-h-11 cursor-pointer items-center rounded-xl border border-white/[0.1] px-4 text-xs font-semibold text-white">Importar backup<input type="file" accept="application/json" onChange={importBackup} className="sr-only" /></label></div></div>
+      </section>
       
       {/* Category Type Toggles (DESPESAS / RECEITAS) */}
       <div className="grid grid-cols-2 gap-2.5 p-1 glass-card rounded-2xl">
@@ -400,6 +444,30 @@ export default function SettingsView() {
           </div>
         )}
 
+        {accounts.some((account) => account.type === 'credit') && (
+          <div className="space-y-2 border-t border-white/[0.06] pt-4">
+            <h4 className="text-xs font-semibold text-zinc-300">Configuração dos cartões</h4>
+            {accounts.filter((account) => account.type === 'credit').map((card) => (
+              <div key={card.id} className="rounded-xl border border-white/[0.08] bg-[#121217] p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div><p className="text-xs font-semibold text-white">{card.name}</p><p className="mt-0.5 text-[11px] text-zinc-400">Fecha dia {card.closingDay || '—'} · vence dia {card.dueDay || '—'} · pagamento em {accounts.find((account) => account.id === card.paymentAccountId)?.name || 'não definida'}</p></div>
+                  <button type="button" onClick={() => setEditingCard({ ...card, minimumPaymentRate: card.minimumPaymentRate ?? 0.15 })} className="min-h-11 min-w-11 rounded-xl text-zinc-400 transition hover:bg-white/[0.05] hover:text-white" aria-label={`Editar configurações de ${card.name}`}><Edit3 size={15} className="mx-auto" /></button>
+                </div>
+                {editingCard?.id === card.id && (
+                  <div className="mt-3 grid gap-3 border-t border-white/[0.06] pt-3 sm:grid-cols-2 lg:grid-cols-5">
+                    <label className="text-[11px] text-zinc-400">Limite<input type="number" min="0" step="0.01" value={editingCard.creditLimit || ''} onChange={(event) => setEditingCard({ ...editingCard, creditLimit: Number(event.target.value) })} className="mt-1 min-h-11 w-full rounded-xl border border-white/[0.08] bg-[#16161d] px-3 font-mono text-white" /></label>
+                    <label className="text-[11px] text-zinc-400">Fechamento<input type="number" min="1" max="31" value={editingCard.closingDay || ''} onChange={(event) => setEditingCard({ ...editingCard, closingDay: Number(event.target.value) })} className="mt-1 min-h-11 w-full rounded-xl border border-white/[0.08] bg-[#16161d] px-3 font-mono text-white" /></label>
+                    <label className="text-[11px] text-zinc-400">Vencimento<input type="number" min="1" max="31" value={editingCard.dueDay || ''} onChange={(event) => setEditingCard({ ...editingCard, dueDay: Number(event.target.value) })} className="mt-1 min-h-11 w-full rounded-xl border border-white/[0.08] bg-[#16161d] px-3 font-mono text-white" /></label>
+                    <label className="text-[11px] text-zinc-400">Conta de pagamento<select value={editingCard.paymentAccountId || ''} onChange={(event) => setEditingCard({ ...editingCard, paymentAccountId: event.target.value })} className="mt-1 min-h-11 w-full rounded-xl border border-white/[0.08] bg-[#16161d] px-3 text-white"><option value="">Não definida</option>{accounts.filter((account) => account.type !== 'credit').map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}</select></label>
+                    <label className="text-[11px] text-zinc-400">Pagamento mínimo (%)<input type="number" min="0" max="100" value={Math.round((editingCard.minimumPaymentRate || 0) * 100)} onChange={(event) => setEditingCard({ ...editingCard, minimumPaymentRate: Number(event.target.value) / 100 })} className="mt-1 min-h-11 w-full rounded-xl border border-white/[0.08] bg-[#16161d] px-3 font-mono text-white" /></label>
+                    <div className="flex gap-2 sm:col-span-2 lg:col-span-5 lg:justify-end"><button type="button" onClick={() => setEditingCard(null)} className="flex min-h-11 items-center gap-2 rounded-xl px-3 text-xs font-semibold text-zinc-300 hover:bg-white/[0.05]"><X size={14} />Cancelar</button><button type="button" onClick={saveCardSettings} className="flex min-h-11 items-center gap-2 rounded-xl bg-[#10b981] px-4 text-xs font-bold text-[#07110e] hover:bg-[#34d399]"><Save size={14} />Salvar cartão</button></div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Form: Add Account */}
         <form onSubmit={handleCreateAccount} className="space-y-3 pt-2 border-t border-white/5">
           <p className="text-xs font-bold text-gray-400 uppercase tracking-widest font-mono">Nova Conta / Cartão</p>
@@ -419,6 +487,8 @@ export default function SettingsView() {
               <option value="credit" className="bg-dark-bg text-white">Cartão de Crédito</option>
               <option value="wallet" className="bg-dark-bg text-white">Carteira / Dinheiro</option>
               <option value="savings" className="bg-dark-bg text-white">Poupança</option>
+              <option value="reserve" className="bg-dark-bg text-white">Reserva</option>
+              <option value="investment" className="bg-dark-bg text-white">Investimento</option>
             </select>
 
             <select
@@ -470,7 +540,7 @@ export default function SettingsView() {
           </div>
 
           {newAccType === 'credit' && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-1">
               <div>
                 <label htmlFor="account-credit-limit" className="block text-[9px] font-bold text-gray-500 font-mono uppercase tracking-wider mb-1">Limite de Crédito Total (R$)</label>
                 <input
@@ -516,6 +586,14 @@ export default function SettingsView() {
                   onChange={(e) => setNewAccDueDay(e.target.value)}
                   className="glass-input rounded-xl px-4 py-2.5 w-full text-xs text-white placeholder-gray-600 outline-none focus:border-indigo-500 transition font-mono"
                 />
+              </div>
+              <div>
+                <label htmlFor="account-payment-account" className="block text-[9px] font-bold text-gray-500 font-mono uppercase tracking-wider mb-1">Conta de pagamento</label>
+                <select id="account-payment-account" value={newAccPaymentAccountId} onChange={(event) => setNewAccPaymentAccountId(event.target.value)} className="glass-input min-h-11 rounded-xl px-3 w-full text-xs text-white bg-dark-bg"><option value="">Escolher depois</option>{accounts.filter((account) => account.type !== 'credit').map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}</select>
+              </div>
+              <div>
+                <label htmlFor="account-minimum-rate" className="block text-[9px] font-bold text-gray-500 font-mono uppercase tracking-wider mb-1">Pagamento mínimo (%)</label>
+                <input id="account-minimum-rate" type="number" min="0" max="100" value={newAccMinimumRate} onChange={(event) => setNewAccMinimumRate(event.target.value)} className="glass-input min-h-11 rounded-xl px-3 w-full text-xs font-mono text-white" />
               </div>
             </div>
           )}

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { Transaction, Account, Category, MarketItem, TransactionType } from './types';
+import { Transaction, Account, Category, MarketItem, SavingsGoal, TransactionType } from './types';
 import { supabaseService, isSupabaseConfigured, setUserEmail } from './lib/supabase';
 import { addMonthsClamped, getEffectiveStatus, getLocalIsoDate } from './lib/finance';
 
@@ -12,6 +12,7 @@ interface FinanceState {
   accounts: Account[];
   categories: Category[];
   marketItems: MarketItem[];
+  savingsGoals: SavingsGoal[];
   hideValues: boolean;
   activeTab: 'inicio' | 'calendario' | 'poupanca' | 'lista' | 'relatorios' | 'ajustes' | 'historico';
   selectedDate: string; // YYYY-MM-DD
@@ -36,12 +37,13 @@ interface FinanceState {
   // Transaction actions
   addTransaction: (data: Omit<Transaction, 'id'> & { totalInstallments?: number }) => void;
   payTransaction: (id: string, accountId: string, amountPaid: number, paymentDate: string, intendedStatus?: 'completed' | 'scheduled') => void;
+  payCreditCardInvoice: (creditCardId: string, invoiceId: string, accountId: string, amount: number, paymentDate: string) => void;
   deleteTransaction: (id: string, deleteOption?: 'only-this' | 'this-and-future' | 'all-group') => void;
   editTransaction: (transaction: Transaction, editOption?: 'only-this' | 'this-and-future' | 'all-group') => void;
   
   // Account actions
   updateAccountBalance: (id: string, initialBalance: number) => void;
-  addAccount: (name: string, balance: number, color: string, type?: string, extra?: { bank?: string; creditLimit?: number; closingDay?: number; dueDay?: number }) => void;
+  addAccount: (name: string, balance: number, color: string, type?: string, extra?: { bank?: string; creditLimit?: number; closingDay?: number; dueDay?: number; paymentAccountId?: string; minimumPaymentRate?: number }) => void;
   deleteAccount: (id: string) => void;
   editAccount: (account: Account) => void;
   
@@ -50,13 +52,16 @@ interface FinanceState {
   deleteCategory: (id: string) => void;
   
   // Market list actions
-  addMarketItem: (name: string, estimatedPrice: number, quantity: number) => void;
+  addMarketItem: (name: string, estimatedPrice: number, quantity: number, details?: Pick<MarketItem, 'listId' | 'category' | 'store' | 'order' | 'lastPurchasedPrice'>) => void;
   toggleMarketItemInCart: (id: string) => void;
   deleteMarketItem: (id: string) => void;
   updateMarketItem: (id: string, quantity: number, price: number) => void;
   clearMarketList: () => void;
+  addSavingsGoal: (goal: Omit<SavingsGoal, 'id' | 'activities'>) => void;
+  deleteSavingsGoal: (id: string) => void;
+  addSavingsGoalActivity: (goalId: string, type: 'contribution' | 'withdrawal', amount: number, date: string) => void;
   
-  convertMarketListToExpense: (accountId: string) => void;
+  convertMarketListToExpense: (accountId: string, listId?: string) => void;
   refreshStatuses: () => void;
   
   // Budget actions
@@ -75,6 +80,8 @@ const defaultAccounts: Account[] = [
   { id: 'acc-3', name: 'Caixa', balance: 0, color: '#005CA9', type: 'checking' },
   { id: 'acc-4', name: 'Carteira', balance: 0, color: '#10B981', type: 'wallet' },
 ];
+
+const affectsCashBalance = (transaction: Transaction) => transaction.kind !== 'card_purchase';
 
 const defaultCategories: Category[] = [
   { id: 'cat-1', name: 'Ajuste', type: 'expense', isSystem: true, iconName: 'Sliders' },
@@ -427,6 +434,7 @@ export const useFinanceStore = create<FinanceState>()(
       accounts: defaultAccounts,
       categories: defaultCategories,
       marketItems: [],
+      savingsGoals: [],
       hideValues: false,
       activeTab: 'inicio',
   selectedDate: getLocalIsoDate(),
@@ -454,6 +462,7 @@ export const useFinanceStore = create<FinanceState>()(
               accounts: parsed.accounts || defaultAccounts,
               categories: parsed.categories || defaultCategories,
               marketItems: parsed.marketItems || [],
+              savingsGoals: parsed.savingsGoals || [],
               categoryBudgets: parsed.categoryBudgets || {}
             });
             return true;
@@ -469,6 +478,7 @@ export const useFinanceStore = create<FinanceState>()(
             const currentAccounts = get().accounts;
             const currentCategories = get().categories;
             const currentMarketItems = get().marketItems;
+            const currentSavingsGoals = get().savingsGoals;
             const currentCategoryBudgets = get().categoryBudgets || {};
             
             const transToSave = currentTransactions.length > 0 ? currentTransactions : [];
@@ -476,12 +486,14 @@ export const useFinanceStore = create<FinanceState>()(
             const catsToSave = currentCategories.length > 0 ? currentCategories : defaultCategories;
             const itemsToSave = currentMarketItems.length > 0 ? currentMarketItems : [];
             const budgetsToSave = currentCategoryBudgets;
+            const goalsToSave = currentSavingsGoals || [];
 
             localStorage.setItem(userKey, JSON.stringify({
               transactions: transToSave,
               accounts: accsToSave,
               categories: catsToSave,
               marketItems: itemsToSave,
+              savingsGoals: goalsToSave,
               categoryBudgets: budgetsToSave
             }));
 
@@ -492,6 +504,7 @@ export const useFinanceStore = create<FinanceState>()(
               accounts: accsToSave,
               categories: catsToSave,
               marketItems: itemsToSave,
+              savingsGoals: goalsToSave,
               categoryBudgets: budgetsToSave
             });
           } else {
@@ -503,6 +516,7 @@ export const useFinanceStore = create<FinanceState>()(
               accounts: resetAccounts,
               categories: defaultCategories,
               marketItems: [],
+              savingsGoals: [],
               categoryBudgets: {}
             }));
 
@@ -513,6 +527,7 @@ export const useFinanceStore = create<FinanceState>()(
               accounts: resetAccounts,
               categories: defaultCategories,
               marketItems: [],
+              savingsGoals: [],
               categoryBudgets: {}
             });
           }
@@ -641,7 +656,11 @@ export const useFinanceStore = create<FinanceState>()(
                 current: i + 1,
                 total: totalInst,
                 groupId: groupId
-              }
+              },
+              kind: data.kind,
+              creditCardId: data.creditCardId,
+              invoiceId: data.invoiceId,
+              paymentDate: data.paymentDate,
             });
           }
         } else if (data.isFixed) {
@@ -660,7 +679,11 @@ export const useFinanceStore = create<FinanceState>()(
               date: formattedDate,
               status: getEffectiveStatus((i === 0 ? data.status : (data.status === 'scheduled' ? 'scheduled' : 'pending')), formattedDate),
               isFixed: true,
-              isInstallment: false
+              isInstallment: false,
+              kind: data.kind,
+              creditCardId: data.creditCardId,
+              invoiceId: data.invoiceId,
+              paymentDate: data.paymentDate,
             });
           }
         } else {
@@ -675,7 +698,11 @@ export const useFinanceStore = create<FinanceState>()(
             date: data.date,
             status: getEffectiveStatus(data.status, data.date),
             isFixed: false,
-            isInstallment: false
+            isInstallment: false,
+            kind: data.kind,
+            creditCardId: data.creditCardId,
+            invoiceId: data.invoiceId,
+            paymentDate: data.paymentDate,
           });
         }
         
@@ -685,7 +712,7 @@ export const useFinanceStore = create<FinanceState>()(
           updatedAccounts = state.accounts.map(acc => {
             let balChange = 0;
             listToAdd.forEach(t => {
-              if (t.status === 'completed') {
+              if (t.status === 'completed' && affectsCashBalance(t)) {
                 if (String(t.accountId).trim() === String(acc.id).trim()) {
                   if (t.type === 'income') balChange += Number(t.amount) || 0;
                   else balChange -= Number(t.amount) || 0;
@@ -741,7 +768,7 @@ export const useFinanceStore = create<FinanceState>()(
           updatedAccounts = state.accounts.map(acc => {
             let balChange = 0;
             state.transactions.forEach(t => {
-              if (toDeleteIds.includes(t.id) && t.status === 'completed') {
+              if (toDeleteIds.includes(t.id) && t.status === 'completed' && affectsCashBalance(t)) {
                 if (String(t.accountId).trim() === String(acc.id).trim()) {
                   if (t.type === 'income') balChange -= Number(t.amount) || 0;
                   else balChange += Number(t.amount) || 0;
@@ -830,7 +857,7 @@ export const useFinanceStore = create<FinanceState>()(
           // Recalculate balances
           updatedAccounts = state.accounts.map(acc => {
             let balChange = 0;
-            if (toAdd && toAdd.status === 'completed') {
+            if (toAdd && toAdd.status === 'completed' && affectsCashBalance(toAdd)) {
                 if (String(toAdd.accountId).trim() === String(acc.id).trim()) {
                   if (toAdd.type === 'income') balChange += Number(toAdd.amount) || 0;
                   else balChange -= Number(toAdd.amount) || 0;
@@ -844,13 +871,13 @@ export const useFinanceStore = create<FinanceState>()(
               const prev = state.transactions.find(t => t.id === upd.id);
               if (!prev) return;
               
-              if (prev.status === 'completed') {
+              if (prev.status === 'completed' && affectsCashBalance(prev)) {
                 if (String(prev.accountId).trim() === String(acc.id).trim()) {
                   if (prev.type === 'income') balChange -= Number(prev.amount) || 0;
                   else balChange += Number(prev.amount) || 0;
                 }
               }
-              if (upd.status === 'completed') {
+              if (upd.status === 'completed' && affectsCashBalance(upd)) {
                 if (String(upd.accountId).trim() === String(acc.id).trim()) {
                   if (upd.type === 'income') balChange += Number(upd.amount) || 0;
                   else balChange -= Number(upd.amount) || 0;
@@ -884,6 +911,28 @@ export const useFinanceStore = create<FinanceState>()(
           if (toAdd) supabaseService.saveTransaction(toAdd);
           updatedAccounts.forEach(acc => supabaseService.saveAccount(acc));
         }
+      },
+
+      payCreditCardInvoice: (creditCardId, invoiceId, accountId, amount, paymentDate) => {
+        if (!Number.isFinite(amount) || amount <= 0) return;
+        const card = get().accounts.find((account) => account.id === creditCardId && account.type === 'credit');
+        const paymentAccount = get().accounts.find((account) => account.id === accountId && account.type !== 'credit');
+        if (!card || !paymentAccount) return;
+        get().addTransaction({
+          description: `Pagamento da fatura ${card.name}`,
+          amount,
+          type: 'expense',
+          category: 'Pagamento de fatura',
+          accountId,
+          date: paymentDate,
+          paymentDate,
+          status: 'completed',
+          isFixed: false,
+          isInstallment: false,
+          kind: 'invoice_payment',
+          creditCardId,
+          invoiceId,
+        });
       },
 
       editTransaction: (updated, editOption = 'only-this') => {
@@ -933,7 +982,7 @@ export const useFinanceStore = create<FinanceState>()(
               if (!prev) return;
               
               // Revert previous completed transaction
-              if (prev.status === 'completed') {
+              if (prev.status === 'completed' && affectsCashBalance(prev)) {
                 if (String(prev.accountId).trim() === String(acc.id).trim()) {
                   if (prev.type === 'income') balChange -= Number(prev.amount) || 0;
                   else balChange += Number(prev.amount) || 0;
@@ -945,7 +994,7 @@ export const useFinanceStore = create<FinanceState>()(
               }
               
               // Apply updated completed transaction
-              if (upd.status === 'completed') {
+              if (upd.status === 'completed' && affectsCashBalance(upd)) {
                 if (String(upd.accountId).trim() === String(acc.id).trim()) {
                   if (upd.type === 'income') balChange += Number(upd.amount) || 0;
                   else balChange -= Number(upd.amount) || 0;
@@ -1001,7 +1050,9 @@ export const useFinanceStore = create<FinanceState>()(
           bank: extra.bank,
           creditLimit: extra.creditLimit,
           closingDay: extra.closingDay,
-          dueDay: extra.dueDay
+          dueDay: extra.dueDay,
+          paymentAccountId: extra.paymentAccountId,
+          minimumPaymentRate: extra.minimumPaymentRate,
         };
         set((state) => ({
           accounts: [...state.accounts, newAcc]
@@ -1059,8 +1110,40 @@ export const useFinanceStore = create<FinanceState>()(
         }
       },
 
-      addMarketItem: (name, estimatedPrice, quantity) => {
-        const newItem = { id: `m-${Date.now()}`, name, estimatedPrice, quantity, inCart: false };
+      addSavingsGoal: (goal) => {
+        const newGoal: SavingsGoal = { ...goal, id: `goal-${Date.now()}`, activities: [] };
+        set((state) => ({ savingsGoals: [...state.savingsGoals, newGoal] }));
+      },
+
+      deleteSavingsGoal: (id) => set((state) => ({ savingsGoals: state.savingsGoals.filter((goal) => goal.id !== id) })),
+
+      addSavingsGoalActivity: (goalId, type, amount, date) => {
+        if (!Number.isFinite(amount) || amount <= 0) return;
+        let changedAccount: Account | undefined;
+        set((state) => {
+          const goal = state.savingsGoals.find((item) => item.id === goalId);
+          if (!goal) return {};
+          if (type === 'withdrawal' && amount > goal.currentAmount) return {};
+          const delta = type === 'contribution' ? amount : -amount;
+          const accounts = state.accounts.map((account) => {
+            if (account.id !== goal.accountId) return account;
+            changedAccount = { ...account, balance: Math.round((account.balance + delta + Number.EPSILON) * 100) / 100 };
+            return changedAccount;
+          });
+          return {
+            accounts,
+            savingsGoals: state.savingsGoals.map((item) => item.id === goalId ? {
+              ...item,
+              currentAmount: Math.round((item.currentAmount + delta + Number.EPSILON) * 100) / 100,
+              activities: [{ id: `goal-activity-${Date.now()}`, type, amount, date }, ...item.activities],
+            } : item),
+          };
+        });
+        if (isSupabaseConfigured && changedAccount) supabaseService.saveAccount(changedAccount);
+      },
+
+      addMarketItem: (name, estimatedPrice, quantity, details = {}) => {
+        const newItem = { id: `m-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, name, estimatedPrice, quantity, inCart: false, ...details };
         set((state) => ({
           marketItems: [...state.marketItems, newItem]
         }));
@@ -1137,21 +1220,22 @@ export const useFinanceStore = create<FinanceState>()(
           return {};
         });
       },
-      convertMarketListToExpense: (accountId) => {
+      convertMarketListToExpense: (accountId, listId) => {
         let fullTrans: Transaction | null = null;
         let updatedAccounts: Account[] = [];
         let activeItems: MarketItem[] = [];
 
         set((state) => {
-          // sum items in cart (or all if none are checked)
-          const itemsToConvert = state.marketItems.filter(item => item.inCart);
-          activeItems = itemsToConvert.length > 0 ? itemsToConvert : state.marketItems;
+          // Checkout is explicit: unchecked items are never charged.
+          activeItems = state.marketItems.filter(item => item.inCart && (!listId || (item.listId || 'default') === listId));
           
           if (activeItems.length === 0) return {};
           
           const total = activeItems.reduce((sum, item) => sum + (item.estimatedPrice * item.quantity), 0);
           const itemNames = activeItems.map(item => `${item.name} (x${item.quantity})`).join(', ');
           
+          const destination = state.accounts.find((account) => account.id === accountId);
+          const isCreditCard = destination?.type === 'credit';
           // Add a single grocery transaction
           const newTrans: Omit<Transaction, 'id'> = {
             description: 'Compras de Supermercado',
@@ -1163,7 +1247,9 @@ export const useFinanceStore = create<FinanceState>()(
             date: getLocalIsoDate(),
             status: 'completed',
             isFixed: false,
-            isInstallment: false
+            isInstallment: false,
+            kind: isCreditCard ? 'card_purchase' : 'transaction',
+            creditCardId: isCreditCard ? accountId : undefined
           };
 
           // Create transaction and update account balance
@@ -1171,7 +1257,7 @@ export const useFinanceStore = create<FinanceState>()(
           fullTrans = { ...newTrans, id: transId };
           
           updatedAccounts = state.accounts.map(acc => {
-            if (acc.id === accountId) {
+            if (acc.id === accountId && !isCreditCard) {
               return { ...acc, balance: acc.balance - total };
             }
             return acc;

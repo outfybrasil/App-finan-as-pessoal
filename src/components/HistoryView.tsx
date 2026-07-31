@@ -27,11 +27,14 @@ import {
   Compass,
   Coins,
   PlusCircle, ChevronDown, ChevronUp,
-  Activity
+  Activity, CheckSquare, Square, Undo2
 } from 'lucide-react';
 import { Transaction } from '../types';
 import SelectAccountModal from "./SelectAccountModal";
 import ConfirmDeleteModal from "./ConfirmDeleteModal";
+import { getTransactionEffectiveStatus, type EffectiveTransactionStatus } from '../lib/finance';
+import ScenarioPlannerModal from './ScenarioPlannerModal';
+import MultiScenarioPlannerModal from './MultiScenarioPlannerModal';
 
 interface HistoryViewProps {
   onEditTransaction: (t: Transaction) => void;
@@ -57,11 +60,16 @@ export default function HistoryView({ onEditTransaction }: HistoryViewProps) {
   const [categoryFilter, setCategoryFilter] = useState<string>('todas');
   const [typeFilter, setTypeFilter] = useState<'todos' | 'income' | 'expense'>('todos');
   const [accountFilter, setAccountFilter] = useState<string>('todas');
-  const [statusFilter, setStatusFilter] = useState<'todos' | 'completed' | 'pending' | 'scheduled'>('todos');
+  const [statusFilter, setStatusFilter] = useState<'todos' | EffectiveTransactionStatus>('todos');
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
   const [transactionToComplete, setTransactionToComplete] = useState<Transaction | null>(null);
   const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
+  const [transactionToSimulate, setTransactionToSimulate] = useState<Transaction | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
+  const [groupMode, setGroupMode] = useState<'category' | 'account'>('category');
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [showMultiScenario, setShowMultiScenario] = useState(false);
+  const [undoTransaction, setUndoTransaction] = useState<Transaction | null>(null);
 
   // Month and Day names helper
   const monthsNames = [
@@ -136,7 +144,7 @@ export default function HistoryView({ onEditTransaction }: HistoryViewProps) {
 
     // 6. Status filter
     if (statusFilter !== 'todos') {
-      if (t.status !== statusFilter) return false;
+      if (getTransactionEffectiveStatus(t) !== statusFilter) return false;
     }
 
     return true;
@@ -149,25 +157,28 @@ export default function HistoryView({ onEditTransaction }: HistoryViewProps) {
   });
 
   // Calculate dynamic stats based on filtered set
-  const filteredIncomes = filteredTransactions
+  const cashTransactions = filteredTransactions.filter(t => t.kind !== 'card_purchase');
+  const filteredIncomes = cashTransactions
     .filter(t => t.type === 'income')
     .reduce((sum, t) => sum + t.amount, 0);
 
-  const filteredExpenses = filteredTransactions
+  const filteredExpenses = cashTransactions
     .filter(t => t.type === 'expense')
     .reduce((sum, t) => sum + t.amount, 0);
 
   const filteredBalance = filteredIncomes - filteredExpenses;
 
-  // Group transactions by category
+  // Group transactions by category or account/card
   const groupedTransactions = sortedTransactions.reduce((acc, t) => {
-    if (!acc[t.category]) acc[t.category] = [];
-    acc[t.category].push(t);
+    const key = groupMode === 'category' ? t.category : (accounts.find((account) => account.id === t.accountId)?.name || 'Sem conta');
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(t);
     return acc;
   }, {} as Record<string, Transaction[]>);
   
   // Sort category names alphabetically
   const categoryNames = Object.keys(groupedTransactions).sort();
+  const selectedTransactions = transactions.filter((transaction) => selectedIds.includes(transaction.id));
   
   const toggleCategory = (cat: string) => {
     setExpandedCategories(prev => ({
@@ -181,6 +192,7 @@ export default function HistoryView({ onEditTransaction }: HistoryViewProps) {
     if (t.status === 'pending' || t.status === 'scheduled') {
       setTransactionToComplete(t);
     } else {
+      setUndoTransaction(t);
       editTransaction({
         ...t,
         status: 'pending'
@@ -190,9 +202,16 @@ export default function HistoryView({ onEditTransaction }: HistoryViewProps) {
 
   const handleConfirmPaymentAccount = (data: { accountId: string, amountPaid: number, paymentDate: string, intendedStatus?: 'completed' | 'scheduled' }) => {
     if (transactionToComplete) {
+      if (data.amountPaid === transactionToComplete.amount) setUndoTransaction(transactionToComplete);
       payTransaction(transactionToComplete.id, data.accountId, data.amountPaid, data.paymentDate, data.intendedStatus);
       setTransactionToComplete(null);
     }
+  };
+
+  const undoLastStatusChange = () => {
+    if (!undoTransaction) return;
+    editTransaction(undoTransaction);
+    setUndoTransaction(null);
   };
 
   // Delete handler matching Dashboard design
@@ -354,19 +373,20 @@ export default function HistoryView({ onEditTransaction }: HistoryViewProps) {
           {/* Status Selection */}
           <div className="space-y-1.5">
             <span id="history-status-label" className="text-[10px] font-mono text-gray-400 uppercase tracking-widest font-bold block">Situação</span>
-            <div role="group" aria-labelledby="history-status-label" className="grid grid-cols-4 gap-1 p-1 glass-input rounded-xl min-h-11 items-center">
-              {(['todos', 'completed', 'pending', 'scheduled'] as const).map(s => (
+            <div role="group" aria-labelledby="history-status-label" className="grid grid-cols-5 gap-1 p-1 glass-input rounded-xl min-h-11 items-center">
+              {(['todos', 'completed', 'pending', 'scheduled', 'overdue'] as const).map(s => (
                 <button
                   key={s}
                   type="button"
                   onClick={() => setStatusFilter(s)}
+                  aria-pressed={statusFilter === s}
                   className={`py-1 rounded-lg text-[9px] font-bold uppercase transition select-none tracking-wider ${
                     statusFilter === s 
                       ? 'bg-white/10 text-white shadow-md' 
                       : 'text-gray-400 hover:text-white'
                   }`}
                 >
-                  {s === 'todos' ? 'Todos' : s === 'completed' ? 'Pago' : s === 'pending' ? 'Pend' : 'Agend'}
+                  {s === 'todos' ? 'Todos' : s === 'completed' ? 'Pago' : s === 'pending' ? 'Pend' : s === 'scheduled' ? 'Agend' : 'Atras'}
                 </button>
               ))}
             </div>
@@ -421,6 +441,15 @@ export default function HistoryView({ onEditTransaction }: HistoryViewProps) {
           </span>
         </div>
 
+        <div className="flex flex-col gap-3 rounded-2xl border border-white/[0.08] bg-[#0f0f13] p-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex gap-1" role="group" aria-label="Agrupar movimentações">
+            {([['category', 'Por categoria'], ['account', 'Por conta/cartão']] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={groupMode === value} onClick={() => setGroupMode(value)} className={`min-h-11 rounded-xl px-3 text-xs font-semibold transition ${groupMode === value ? 'bg-[#24242c] text-white' : 'text-zinc-400 hover:bg-white/[0.05] hover:text-white'}`}>{label}</button>)}
+          </div>
+          <div className="flex items-center gap-2"><span className="text-xs text-zinc-400">{selectedIds.length} selecionada{selectedIds.length === 1 ? '' : 's'}</span><button type="button" disabled={selectedIds.length < 2} onClick={() => setShowMultiScenario(true)} className="min-h-11 rounded-xl bg-[#10b981] px-3 text-xs font-bold text-[#07110e] transition disabled:cursor-not-allowed disabled:opacity-40">Simular seleção</button></div>
+        </div>
+
+        {undoTransaction && <div role="status" className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.08] bg-[#16161d] p-3"><p className="text-xs text-zinc-300">Situação de “{undoTransaction.description}” alterada.</p><button type="button" onClick={undoLastStatusChange} className="flex min-h-11 items-center gap-2 rounded-xl px-3 text-xs font-semibold text-emerald-300 hover:bg-[#10251f]"><Undo2 size={15} />Desfazer</button></div>}
+
         {sortedTransactions.length === 0 ? (
           <div className="glass-card border-dashed rounded-[32px] py-16 px-6 text-center shadow-xl flex flex-col items-center justify-center">
             <Inbox size={36} className="text-gray-600 mb-3" />
@@ -466,6 +495,7 @@ export default function HistoryView({ onEditTransaction }: HistoryViewProps) {
                         const account = accounts.find(a => a.id === t.accountId);
                         const isExpense = t.type === 'expense';
                         const isCompleted = t.status === 'completed';
+                        const effectiveStatus = getTransactionEffectiveStatus(t);
 
                         return (
                           <div 
@@ -473,6 +503,7 @@ export default function HistoryView({ onEditTransaction }: HistoryViewProps) {
                             className="bg-dark-card rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 group border border-white/5 hover:border-white/10 transition"
                           >
                             <div className="flex items-start sm:items-center gap-3">
+                              {isExpense && !isCompleted && t.kind !== 'card_purchase' && <button type="button" onClick={() => setSelectedIds((current) => current.includes(t.id) ? current.filter((id) => id !== t.id) : [...current, t.id])} aria-label={`${selectedIds.includes(t.id) ? 'Remover' : 'Selecionar'} ${t.description}`} aria-pressed={selectedIds.includes(t.id)} className="min-h-11 min-w-11 rounded-xl text-zinc-400 hover:bg-white/[0.05] hover:text-white">{selectedIds.includes(t.id) ? <CheckSquare size={18} className="mx-auto text-emerald-300" /> : <Square size={18} className="mx-auto" />}</button>}
                               {/* Icon Sphere */}
                               <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border mt-0.5 sm:mt-0 ${
                                 isExpense 
@@ -531,31 +562,46 @@ export default function HistoryView({ onEditTransaction }: HistoryViewProps) {
                                 
                                 <button 
                                   onClick={() => handleToggleStatus(t)}
+                                  disabled={t.kind === 'card_purchase'}
                                   className={`text-[9px] font-mono font-bold mt-0.5 px-1.5 py-0.5 rounded-md transition ${
-                                    t.status === 'completed'
+                                    t.kind === 'card_purchase'
+                                      ? 'bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 cursor-default'
+                                    : effectiveStatus === 'completed'
                                       ? 'bg-emerald-accent/10 text-emerald-accent border border-emerald-accent/15'
-                                      : t.status === 'scheduled'
+                                      : effectiveStatus === 'overdue'
+                                        ? 'bg-[#281419] text-rose-300 border border-rose-500/25'
+                                      : effectiveStatus === 'scheduled'
                                         ? 'bg-blue-500/10 text-blue-500 border border-blue-500/15'
                                         : 'bg-amber-500/10 text-amber-500 border border-amber-500/15'
                                   }`}
-                                  title="Clique para alternar situação"
+                                  title={t.kind === 'card_purchase' ? 'O pagamento é controlado pela fatura' : 'Clique para alternar situação'}
                                 >
-                                  {t.status === 'completed' ? 'PAGO' : t.status === 'scheduled' ? 'AGENDADO' : 'PENDENTE'}
+                                  {t.kind === 'card_purchase' ? 'NA FATURA' : effectiveStatus === 'completed' ? 'PAGO' : effectiveStatus === 'overdue' ? 'ATRASADO' : effectiveStatus === 'scheduled' ? 'AGENDADO' : 'PENDENTE'}
                                 </button>
                               </div>
 
                               {/* Action controls */}
                               <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                                {isExpense && !isCompleted && (
+                                  <button
+                                    onClick={() => setTransactionToSimulate(t)}
+                                    className="min-h-11 min-w-11 p-2 hover:bg-[#10251f] text-zinc-400 hover:text-emerald-300 rounded-lg transition"
+                                    title="Simular pagamento"
+                                    aria-label={`Simular pagamento de ${t.description}`}
+                                  >
+                                    <Activity size={14} aria-hidden="true" />
+                                  </button>
+                                )}
                                 <button
                                   onClick={() => onEditTransaction(t)}
-                                  className="p-2 hover:bg-white/5 text-gray-400 hover:text-white rounded-lg transition"
+                                  className="min-h-11 min-w-11 p-2 hover:bg-white/5 text-gray-400 hover:text-white rounded-lg transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70"
                                   title="Editar"
                                 >
                                   <Edit3 size={14} />
                                 </button>
                                 <button
                                   onClick={() => handleDelete(t)}
-                                  className="p-2 hover:bg-white/5 text-gray-400 hover:text-pink-accent rounded-lg transition"
+                                  className="min-h-11 min-w-11 p-2 hover:bg-white/5 text-gray-400 hover:text-pink-accent rounded-lg transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400/70"
                                   title="Excluir"
                                 >
                                   <Trash2 size={14} />
@@ -587,6 +633,12 @@ export default function HistoryView({ onEditTransaction }: HistoryViewProps) {
         onClose={() => setTransactionToComplete(null)}
         onConfirm={handleConfirmPaymentAccount}
       />
+      <ScenarioPlannerModal
+        isOpen={!!transactionToSimulate}
+        transaction={transactionToSimulate}
+        onClose={() => setTransactionToSimulate(null)}
+      />
+      <MultiScenarioPlannerModal isOpen={showMultiScenario} transactions={selectedTransactions} onClose={() => setShowMultiScenario(false)} />
     </div>
   );
 }

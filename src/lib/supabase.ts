@@ -139,6 +139,10 @@ const serializeTransaction = (t: Transaction) => {
     is_fixed: !!t.isFixed,
     is_installment: !!t.isInstallment,
     installment_info: t.installmentInfo ? JSON.stringify(t.installmentInfo) : null,
+    payment_date: t.paymentDate || null,
+    kind: t.kind || 'transaction',
+    credit_card_id: t.creditCardId ? prefixId(t.creditCardId) : null,
+    invoice_id: t.invoiceId || null,
   };
 };
 
@@ -173,6 +177,10 @@ const deserializeTransaction = (doc: any): Transaction => {
     isFixed: doc.isFixed != null ? !!doc.isFixed : !!doc.is_fixed,
     isInstallment: doc.isInstallment != null ? !!doc.isInstallment : !!doc.is_installment,
     installmentInfo,
+    paymentDate: doc.paymentDate || doc.payment_date || undefined,
+    kind: doc.kind || undefined,
+    creditCardId: doc.creditCardId || doc.credit_card_id ? unprefixId(doc.creditCardId || doc.credit_card_id) : undefined,
+    invoiceId: doc.invoiceId || doc.invoice_id || undefined,
   };
 };
 
@@ -254,6 +262,8 @@ export const supabaseService = {
         creditLimit: doc.creditLimit != null ? Number(doc.creditLimit) : (doc.credit_limit != null ? Number(doc.credit_limit) : 0),
         closingDay: doc.closingDay != null ? Number(doc.closingDay) : (doc.closing_day != null ? Number(doc.closing_day) : 0),
         dueDay: doc.dueDay != null ? Number(doc.dueDay) : (doc.due_day != null ? Number(doc.due_day) : 0),
+        paymentAccountId: doc.paymentAccountId || doc.payment_account_id ? unprefixId(doc.paymentAccountId || doc.payment_account_id) : undefined,
+        minimumPaymentRate: doc.minimumPaymentRate != null ? Number(doc.minimumPaymentRate) : (doc.minimum_payment_rate != null ? Number(doc.minimum_payment_rate) : undefined),
         userId: doc.userId || doc.user_id || '',
       }));
     } catch (e) {
@@ -283,6 +293,12 @@ export const supabaseService = {
     }
     if (acc.dueDay !== undefined) {
       data.due_day = Number(acc.dueDay);
+    }
+    if (acc.paymentAccountId) {
+      data.payment_account_id = prefixId(acc.paymentAccountId);
+    }
+    if (acc.minimumPaymentRate !== undefined) {
+      data.minimum_payment_rate = Number(acc.minimumPaymentRate);
     }
     
     try {
@@ -431,6 +447,11 @@ export const supabaseService = {
         estimatedPrice: doc.estimatedPrice != null ? Number(doc.estimatedPrice) : (doc.estimated_price != null ? Number(doc.estimated_price) : 0),
         quantity: doc.quantity != null ? Number(doc.quantity) : 0,
         inCart: doc.inCart != null ? !!doc.inCart : (doc.in_cart != null ? !!doc.in_cart : false),
+        listId: doc.list_id || 'default',
+        category: doc.category || undefined,
+        store: doc.store || undefined,
+        order: doc.item_order == null ? undefined : Number(doc.item_order),
+        lastPurchasedPrice: doc.last_purchased_price == null ? undefined : Number(doc.last_purchased_price),
       }));
     } catch (e) {
       console.error('Supabase: Erro ao listar itens de mercado', e);
@@ -446,6 +467,11 @@ export const supabaseService = {
       estimated_price: Number(item.estimatedPrice),
       quantity: Number(item.quantity),
       in_cart: !!item.inCart,
+      list_id: item.listId || 'default',
+      category: item.category || null,
+      store: item.store || null,
+      item_order: item.order ?? null,
+      last_purchased_price: item.lastPurchasedPrice ?? null,
     };
     try {
       const { error } = await supabase.from('market_items').upsert(data, { onConflict: 'id' });

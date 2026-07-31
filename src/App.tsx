@@ -27,6 +27,7 @@ export default function App() {
     categories,
     marketItems,
     categoryBudgets,
+    savingsGoals,
     logoutUser,
     refreshStatuses
   } = useFinanceStore();
@@ -42,10 +43,11 @@ export default function App() {
         accounts,
         categories,
         marketItems,
-        categoryBudgets
+        categoryBudgets,
+        savingsGoals,
       }));
     }
-  }, [isAuthenticated, user?.email, transactions, accounts, categories, marketItems, categoryBudgets]);
+  }, [isAuthenticated, user?.email, transactions, accounts, categories, marketItems, categoryBudgets, savingsGoals]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -84,7 +86,7 @@ export default function App() {
   const navItems = [
     { id: 'inicio' as const, label: 'Início', icon: Wallet },
     { id: 'calendario' as const, label: 'Calendário', icon: Calendar },
-    { id: 'poupanca' as const, label: 'Poupança', icon: PiggyBank },
+    { id: 'poupanca' as const, label: 'Metas', icon: PiggyBank },
     { id: 'lista' as const, label: 'Lista', icon: ShoppingCart },
     { id: 'relatorios' as const, label: 'Relatórios', icon: BarChart3 },
     { id: 'ajustes' as const, label: 'Ajustes', icon: Sliders }

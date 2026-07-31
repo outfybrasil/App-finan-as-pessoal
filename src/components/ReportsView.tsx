@@ -1,240 +1,75 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useFinanceStore } from '../store';
-import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Wallet, BarChart3, PieChart, Layers } from 'lucide-react';
-import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { ChevronLeft, ChevronRight, Download, Printer, BarChart3 } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { getTransactionEffectiveStatus, type FinancialView } from '../lib/finance';
+
+const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+const money = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 export default function ReportsView() {
-  const { transactions, hideValues } = useFinanceStore();
-  const [selectedYear, setSelectedYear] = useState(2026);
+  const { transactions, accounts, categories, savingsGoals, hideValues } = useFinanceStore();
+  const [year, setYear] = useState(new Date().getFullYear());
+  const [view, setView] = useState<FinancialView>('realized');
+  const [accountId, setAccountId] = useState('');
+  const [category, setCategory] = useState('');
+  const [status, setStatus] = useState('');
+  const format = (value: number) => hideValues ? '••••••' : money(value);
 
-  const monthsShort = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-  const monthsFull = [
-    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
-  ];
+  const filtered = useMemo(() => transactions.filter((t) => {
+    const effective = getTransactionEffectiveStatus(t);
+    const viewMatch = view === 'all' || (view === 'realized' ? effective === 'completed' : effective !== 'completed');
+    return Number(t.date.slice(0, 4)) === year && viewMatch && (!accountId || t.accountId === accountId) && (!category || t.category === category) && (!status || effective === status);
+  }), [transactions, year, view, accountId, category, status]);
 
-  // Year selector triggers
-  const handlePrevYear = () => setSelectedYear(selectedYear - 1);
-  const handleNextYear = () => setSelectedYear(selectedYear + 1);
+  const previous = useMemo(() => transactions.filter((t) => Number(t.date.slice(0, 4)) === year - 1), [transactions, year]);
+  const totals = useMemo(() => filtered.reduce((sum, t) => ({ ...sum, [t.type]: sum[t.type] + t.amount }), { income: 0, expense: 0 }), [filtered]);
+  const previousExpense = previous.filter((t) => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+  const variation = previousExpense ? ((totals.expense - previousExpense) / previousExpense) * 100 : null;
+  const chart = useMemo(() => months.map((name, index) => {
+    const items = filtered.filter((t) => Number(t.date.slice(5, 7)) === index + 1);
+    return { name, Entradas: items.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0), Saídas: items.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0) };
+  }), [filtered]);
+  const future = filtered.filter((t) => getTransactionEffectiveStatus(t) !== 'completed');
+  const installments = future.filter((t) => t.isInstallment).reduce((sum, t) => sum + t.amount, 0);
+  const reserves = accounts.filter((a) => ['savings', 'reserve', 'investment'].includes(a.type || '')).reduce((sum, a) => sum + a.balance, 0);
+  const incomeCommitment = totals.income ? (totals.expense / totals.income) * 100 : 0;
 
-  // Helper to format currency
-  const formatVal = (num: number) => {
-    if (hideValues) return '••••••';
-    return num.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const exportCsv = () => {
+    const escape = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+    const rows = [['Data', 'Descrição', 'Tipo', 'Categoria', 'Conta', 'Status', 'Valor'], ...filtered.map((t) => [t.date, t.description, t.type, t.category, accounts.find((a) => a.id === t.accountId)?.name || '', getTransactionEffectiveStatus(t), t.amount.toFixed(2)])];
+    const blob = new Blob(['\uFEFF' + rows.map((row) => row.map(escape).join(';')).join('\n')], { type: 'text/csv;charset=utf-8' });
+    const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `relatorio-${year}.csv`; link.click(); URL.revokeObjectURL(link.href);
   };
 
-  // Filter transactions for selected year
-  const yearlyTransactions = transactions.filter(t => {
-    return new Date(t.date + 'T12:00:00').getFullYear() === selectedYear;
-  });
-
-  // Totals
-  const totalIncome = yearlyTransactions
-    .filter(t => t.type === 'income')
-    .reduce((sum, t) => sum + t.amount, 0);
-
-  const totalExpense = yearlyTransactions
-    .filter(t => t.type === 'expense')
-    .reduce((sum, t) => sum + t.amount, 0);
-
-  const balance = totalIncome - totalExpense;
-
-  // Compile monthly data for Recharts (dual bars: Income vs Expense)
-  const monthlyChartData = monthsShort.map((month, idx) => {
-    const monthTrans = yearlyTransactions.filter(t => {
-      const date = new Date(t.date + 'T12:00:00');
-      return date.getMonth() === idx;
-    });
-
-    const income = monthTrans
-      .filter(t => t.type === 'income')
-      .reduce((sum, t) => sum + t.amount, 0);
-
-    const expense = monthTrans
-      .filter(t => t.type === 'expense')
-      .reduce((sum, t) => sum + t.amount, 0);
-
-    return {
-      name: month,
-      Entradas: Math.round(income * 100) / 100,
-      Saídas: Math.round(expense * 100) / 100
-    };
-  });
-
-  // Category breakdown calculations (expense only)
-  const categoryExpenses: { [key: string]: number } = {};
-  yearlyTransactions
-    .filter(t => t.type === 'expense')
-    .forEach(t => {
-      categoryExpenses[t.category] = (categoryExpenses[t.category] || 0) + t.amount;
-    });
-
-  const sortedCategoryExpenses = Object.entries(categoryExpenses)
-    .map(([category, amount]) => ({ category, amount }))
-    .sort((a, b) => b.amount - a.amount);
-
-  const totalCategoryExpensesSum = sortedCategoryExpenses.reduce((sum, item) => sum + item.amount, 0);
-
-  // Recharts custom Tooltip
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-[#121212] border border-[#222222] p-4 rounded-2xl shadow-xl font-sans text-xs">
-          <p className="text-gray-400 font-mono mb-1.5">{label} de {selectedYear}</p>
-          <p className="text-emerald-accent font-medium flex justify-between gap-6 mb-1">
-            <span>Receitas:</span>
-            <span className="font-bold font-mono">{formatVal(payload[0].value)}</span>
-          </p>
-          <p className="text-pink-accent font-medium flex justify-between gap-6">
-            <span>Despesas:</span>
-            <span className="font-bold font-mono">{formatVal(payload[1].value)}</span>
-          </p>
-        </div>
-      );
-    }
-    return null;
-  };
-
-  return (
-    <div className="space-y-6 max-w-4xl mx-auto pb-24">
-      
-      {/* Year Selector Row */}
-      <div className="flex items-center justify-between glass-card p-2.5 rounded-2xl">
-        <button 
-          onClick={handlePrevYear}
-          className="p-2 hover:bg-dark-bg rounded-xl text-gray-400 hover:text-white transition"
-        >
-          <ChevronLeft size={20} />
-        </button>
-        
-        <div className="flex items-center gap-2 font-display font-bold text-white text-base">
-          <span>Relatório de</span>
-          <span className="bg-emerald-accent/10 border border-emerald-accent/15 px-3 py-0.5 rounded-lg text-emerald-accent">{selectedYear}</span>
-        </div>
-        
-        <button 
-          onClick={handleNextYear}
-          className="p-2 hover:bg-dark-bg rounded-xl text-gray-400 hover:text-white transition"
-        >
-          <ChevronRight size={20} />
-        </button>
-      </div>
-
-      {/* Annual KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Receita Anual */}
-        <div className="glass-card rounded-[24px] p-5 relative overflow-hidden">
-          <p className="text-gray-500 text-[10px] font-mono uppercase tracking-widest mb-1.5 font-bold">Receita Anual</p>
-          <h3 className="text-2xl font-black font-display text-white">
-            {formatVal(totalIncome)}
-          </h3>
-          <div className="absolute -right-6 -bottom-6 w-16 h-16 bg-emerald-accent/5 rounded-full blur-xl"></div>
-        </div>
-
-        {/* Despesa Anual */}
-        <div className="glass-card rounded-[24px] p-5 relative overflow-hidden">
-          <p className="text-gray-500 text-[10px] font-mono uppercase tracking-widest mb-1.5 font-bold">Despesa Anual</p>
-          <h3 className="text-2xl font-black font-display text-white">
-            {formatVal(totalExpense)}
-          </h3>
-          <div className="absolute -right-6 -bottom-6 w-16 h-16 bg-pink-accent/5 rounded-full blur-xl"></div>
-        </div>
-
-        {/* Balanço Final */}
-        <div className="glass-card rounded-[24px] p-5 relative overflow-hidden">
-          <p className="text-gray-500 text-[10px] font-mono uppercase tracking-widest mb-1.5 font-bold">Balanço Final</p>
-          <h3 className={`text-2xl font-black font-display ${balance >= 0 ? 'text-emerald-accent' : 'text-pink-accent'}`}>
-            {formatVal(balance)}
-          </h3>
-          <div className="absolute -right-6 -bottom-6 w-16 h-16 bg-blue-500/5 rounded-full blur-xl"></div>
-        </div>
-      </div>
-
-      {/* Dual Bar Chart Comparison */}
-      <div className="glass-card rounded-[28px] p-5 space-y-4 shadow-xl">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <BarChart3 size={16} className="text-emerald-accent" />
-            <h3 className="text-xs font-bold text-white uppercase tracking-widest font-mono">Comparativo de Fluxo</h3>
-          </div>
-          <span className="text-[10px] text-gray-400 font-mono bg-[#1a1a1a] px-2 py-0.5 rounded">Mês a Mês</span>
-        </div>
-
-        <div className="h-64 w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={monthlyChartData}
-              margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-            >
-              <XAxis 
-                dataKey="name" 
-                stroke="#555555" 
-                fontSize={9} 
-                tickLine={false} 
-                axisLine={false}
-                fontFamily="JetBrains Mono"
-              />
-              <YAxis 
-                stroke="#555555" 
-                fontSize={9} 
-                tickLine={false} 
-                axisLine={false}
-                fontFamily="JetBrains Mono"
-                tickFormatter={(v) => `R$ ${v}`}
-              />
-              <Tooltip content={<CustomTooltip />} />
-              <Legend 
-                iconSize={8}
-                iconType="circle"
-                wrapperStyle={{ fontSize: 9, fontFamily: 'JetBrains Mono', paddingTop: 10 }}
-              />
-              <Bar dataKey="Entradas" fill="#00C896" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="Saídas" fill="#FF3B6A" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* Category Expense Breakdown */}
-      <div className="glass-card rounded-[28px] p-5 space-y-4.5 shadow-xl">
-        <div className="flex items-center gap-2">
-          <Layers size={16} className="text-pink-accent" />
-          <h3 className="text-xs font-bold text-white uppercase tracking-widest font-mono">Gastos por Categoria</h3>
-        </div>
-
-        {sortedCategoryExpenses.length === 0 ? (
-          <p className="text-xs text-gray-500 text-center py-6">Nenhum gasto registrado neste ano.</p>
-        ) : (
-          <div className="space-y-3.5">
-            {sortedCategoryExpenses.map((catItem, idx) => {
-              const percent = totalCategoryExpensesSum > 0 
-                ? Math.round((catItem.amount / totalCategoryExpensesSum) * 100) 
-                : 0;
-
-              return (
-                <div key={catItem.category} className="space-y-1.5">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="font-semibold text-white tracking-tight">{catItem.category}</span>
-                    <div className="flex items-center gap-2 font-mono">
-                      <span className="text-gray-400 font-bold">{formatVal(catItem.amount)}</span>
-                      <span className="text-gray-600">({percent}%)</span>
-                    </div>
-                  </div>
-                  
-                  {/* Progress Line */}
-                  <div className="w-full bg-dark-bg h-1.5 rounded-full overflow-hidden border border-dark-border">
-                    <div 
-                      className="bg-pink-accent h-full rounded-full transition-all duration-500"
-                      style={{ width: `${percent}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
+  return <div className="mx-auto max-w-5xl space-y-6 pb-24">
+    <div className="flex items-center justify-between rounded-2xl border border-white/[0.08] bg-[#0f0f13] p-2.5">
+      <button aria-label="Ano anterior" onClick={() => setYear(year - 1)} className="min-h-11 min-w-11 rounded-xl text-zinc-400 hover:bg-white/[0.05] hover:text-white"><ChevronLeft className="mx-auto" /></button>
+      <h2 className="font-display font-bold text-white">Relatório de <span className="text-emerald-400">{year}</span></h2>
+      <button aria-label="Próximo ano" onClick={() => setYear(year + 1)} className="min-h-11 min-w-11 rounded-xl text-zinc-400 hover:bg-white/[0.05] hover:text-white"><ChevronRight className="mx-auto" /></button>
     </div>
-  );
+
+    <div className="grid gap-3 rounded-2xl border border-white/[0.08] bg-[#0f0f13] p-4 sm:grid-cols-2 lg:grid-cols-5">
+      <select aria-label="Visão financeira" value={view} onChange={(e) => setView(e.target.value as FinancialView)} className="min-h-11 rounded-xl bg-[#18181f] px-3 text-xs text-white"><option value="realized">Realizado</option><option value="forecast">Previsto</option><option value="all">Todos</option></select>
+      <select aria-label="Conta ou cartão" value={accountId} onChange={(e) => setAccountId(e.target.value)} className="min-h-11 rounded-xl bg-[#18181f] px-3 text-xs text-white"><option value="">Todas as contas</option>{accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select>
+      <select aria-label="Categoria" value={category} onChange={(e) => setCategory(e.target.value)} className="min-h-11 rounded-xl bg-[#18181f] px-3 text-xs text-white"><option value="">Todas as categorias</option>{categories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}</select>
+      <select aria-label="Status" value={status} onChange={(e) => setStatus(e.target.value)} className="min-h-11 rounded-xl bg-[#18181f] px-3 text-xs text-white"><option value="">Todos os status</option><option value="completed">Pago</option><option value="pending">Pendente</option><option value="scheduled">Agendado</option><option value="overdue">Atrasado</option></select>
+      <div className="flex gap-2"><button onClick={exportCsv} className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-white/[0.08] text-xs text-zinc-200"><Download size={15}/>CSV</button><button onClick={() => window.print()} className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-white/[0.08] text-xs text-zinc-200"><Printer size={15}/>PDF</button></div>
+    </div>
+
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {[['Entradas', totals.income], ['Saídas', totals.expense], ['Saldo', totals.income - totals.expense], ['Reservas', reserves]].map(([label, value]) => <div key={String(label)} className="rounded-2xl border border-white/[0.08] bg-[#0f0f13] p-4"><p className="text-[10px] uppercase tracking-widest text-zinc-500">{label}</p><p className="mt-1 font-mono text-xl font-bold text-white">{format(Number(value))}</p></div>)}
+    </div>
+
+    <div className="grid gap-3 sm:grid-cols-3">
+      <div className="rounded-2xl border border-white/[0.08] bg-[#0f0f13] p-4"><p className="text-xs text-zinc-400">Variação anual de despesas</p><p className="mt-2 font-mono font-bold text-white">{hideValues || variation === null ? 'Sem base comparável' : `${variation >= 0 ? '+' : ''}${variation.toFixed(1)}%`}</p></div>
+      <div className="rounded-2xl border border-white/[0.08] bg-[#0f0f13] p-4"><p className="text-xs text-zinc-400">Parcelas futuras</p><p className="mt-2 font-mono font-bold text-white">{format(installments)}</p></div>
+      <div className="rounded-2xl border border-white/[0.08] bg-[#0f0f13] p-4"><p className="text-xs text-zinc-400">Comprometimento da renda</p><p className="mt-2 font-mono font-bold text-white">{hideValues ? '••••••' : `${incomeCommitment.toFixed(1)}%`}</p></div>
+    </div>
+
+    <section className="rounded-[24px] border border-white/[0.08] bg-[#0f0f13] p-5" aria-labelledby="cash-flow-title"><div className="mb-4 flex items-center gap-2"><BarChart3 size={16} className="text-emerald-400"/><h3 id="cash-flow-title" className="text-xs font-bold uppercase tracking-widest text-white">Fluxo de caixa mensal</h3></div>{hideValues ? <div className="flex h-56 items-center justify-center rounded-xl border border-dashed border-white/[0.1] text-center text-xs text-zinc-400">Gráfico oculto pelo modo de privacidade.<br/>Valores, proporções e magnitudes não são exibidos.</div> : <div className="h-64"><ResponsiveContainer><BarChart data={chart}><XAxis dataKey="name" stroke="#71717a" fontSize={10}/><YAxis stroke="#71717a" fontSize={9}/><Tooltip formatter={(v) => money(Number(v))}/><Legend/><Bar dataKey="Entradas" fill="#10b981" radius={[4,4,0,0]}/><Bar dataKey="Saídas" fill="#fb7185" radius={[4,4,0,0]}/></BarChart></ResponsiveContainer></div>}
+      <div className="mt-4 overflow-x-auto"><table className="w-full text-left text-xs"><caption className="sr-only">Resumo mensal equivalente ao gráfico</caption><thead className="text-zinc-500"><tr><th className="py-2">Mês</th><th>Entradas</th><th>Saídas</th><th>Saldo</th></tr></thead><tbody>{chart.map((row) => <tr key={row.name} className="border-t border-white/[0.06] text-zinc-300"><th className="py-2 font-medium">{row.name}</th><td>{format(row.Entradas)}</td><td>{format(row.Saídas)}</td><td>{format(row.Entradas-row.Saídas)}</td></tr>)}</tbody></table></div>
+    </section>
+    <p className="text-xs text-zinc-500">{future.length} movimentações compõem o fluxo futuro. {savingsGoals.length} metas acompanham as contas de reserva.</p>
+  </div>;
 }

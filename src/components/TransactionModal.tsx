@@ -2,7 +2,7 @@ import { useState, useEffect, FormEvent } from 'react';
 import { useFinanceStore } from '../store';
 import { X, Info } from 'lucide-react';
 import { Transaction } from '../types';
-import { getLocalIsoDate, parseCurrencyInput } from '../lib/finance';
+import { getEffectiveStatus, getLocalIsoDate, parseCurrencyInput } from '../lib/finance';
 import { useDialogAccessibility } from '../hooks/useDialogAccessibility';
 
 interface TransactionModalProps {
@@ -87,14 +87,15 @@ export default function TransactionModal({ isOpen, onClose, editingTransaction, 
           category,
           accountId,
           date: entries[0].date,
-          status: entries[0].status,
+          status: selectedAccount?.type === 'credit' ? getEffectiveStatus('scheduled', entries[0].date) : entries[0].status,
           isFixed,
           isInstallment,
           installmentInfo: isInstallment ? {
             current: editingTransaction.installmentInfo?.current || 1,
             total: totalInstallments,
             groupId: editingTransaction.installmentInfo?.groupId || Math.random().toString(36).substring(2, 11)
-          } : undefined
+          } : undefined,
+          ...cardFields,
         });
         setShowInstallmentOptions(true);
         return;
@@ -107,14 +108,15 @@ export default function TransactionModal({ isOpen, onClose, editingTransaction, 
           category,
           accountId,
           date: entries[0].date,
-          status: entries[0].status,
+          status: selectedAccount?.type === 'credit' ? getEffectiveStatus('scheduled', entries[0].date) : entries[0].status,
           isFixed,
           isInstallment,
           installmentInfo: isInstallment ? {
             current: editingTransaction.installmentInfo?.current || 1,
             total: totalInstallments,
             groupId: editingTransaction.installmentInfo?.groupId || Math.random().toString(36).substring(2, 11)
-          } : undefined
+          } : undefined,
+          ...cardFields,
         });
       }
     } else {
@@ -126,10 +128,11 @@ export default function TransactionModal({ isOpen, onClose, editingTransaction, 
           category,
           accountId,
           date: entry.date,
-          status: entry.status,
+          status: selectedAccount?.type === 'credit' ? getEffectiveStatus('scheduled', entry.date) : entry.status,
           isFixed,
           isInstallment,
-          totalInstallments: isInstallment ? totalInstallments : undefined
+          totalInstallments: isInstallment ? totalInstallments : undefined,
+          ...cardFields,
         });
       });
     }
@@ -147,6 +150,10 @@ export default function TransactionModal({ isOpen, onClose, editingTransaction, 
   };
 
   const filteredCategories = categories.filter(c => c.type === type);
+  const selectedAccount = accounts.find((account) => account.id === accountId);
+  const cardFields = selectedAccount?.type === 'credit'
+    ? { kind: 'card_purchase' as const, creditCardId: selectedAccount.id, invoiceId: undefined }
+    : { kind: 'transaction' as const, creditCardId: undefined, invoiceId: undefined };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs overflow-y-auto">
@@ -194,7 +201,7 @@ export default function TransactionModal({ isOpen, onClose, editingTransaction, 
               onClick={() => setType('income')}
               className={`py-2 text-xs font-semibold rounded-lg transition font-display duration-150 active:scale-[0.98] ${
                 type === 'income'
-                  ? 'bg-emerald-500 text-zinc-950 font-bold'
+                  ? 'bg-emerald-500 text-[#07110e] font-bold'
                   : 'text-zinc-400 hover:text-zinc-200'
               }`}
             >
@@ -439,7 +446,7 @@ export default function TransactionModal({ isOpen, onClose, editingTransaction, 
                       {totalInstallments}x
                     </span>
                   </div>
-                  <div className="mt-2 text-[10px] text-zinc-400 flex items-center gap-1.5 bg-rose-500/5 p-2 border border-rose-500/10 rounded-lg">
+                  <div className="mt-2 text-[10px] text-zinc-300 flex items-center gap-1.5 bg-[#1e1216] p-2 border border-rose-500/10 rounded-lg">
                     <Info size={12} className="text-rose-400 shrink-0" />
                     <span>{totalInstallments} parcelas mensais de R$ {(parseFloat(amount.replace(/\./g, '').replace(',', '.')) || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}.</span>
                   </div>
@@ -455,7 +462,7 @@ export default function TransactionModal({ isOpen, onClose, editingTransaction, 
               className={`w-full py-3 rounded-xl font-semibold font-display text-xs tracking-wide transition duration-150 active:scale-[0.98] ${
                 type === 'expense'
                   ? 'bg-rose-500 hover:bg-rose-400 text-white'
-                  : 'bg-emerald-500 hover:bg-emerald-400 text-zinc-950'
+                  : 'bg-emerald-500 hover:bg-emerald-400 text-[#07110e]'
               }`}
             >
               {editingTransaction ? 'SALVAR ALTERAÇÕES' : 'CONFIRMAR LANÇAMENTO'}

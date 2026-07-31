@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useFinanceStore } from '../store';
 import { TrendingUp, TrendingDown, CreditCard, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Check, AlertCircle, Edit3, Trash2, Sliders, Calendar, Eye, EyeOff, Wallet, ShieldCheck, Sparkles } from 'lucide-react';
 import { Transaction, Account } from '../types';
 import SelectAccountModal from './SelectAccountModal';
 import ConfirmDeleteModal from './ConfirmDeleteModal';
 import CreditCardsOverview from './CreditCardsOverview';
+import { getTransactionTotals, getTransactionsForView, type FinancialView } from '../lib/finance';
 
 interface DashboardViewProps {
   onEditTransaction: (t: Transaction) => void;
@@ -17,6 +18,7 @@ export default function DashboardView({ onEditTransaction }: DashboardViewProps)
     updateAccountBalance,
     editTransaction,
     payTransaction,
+    payCreditCardInvoice,
     deleteTransaction,
     hideValues,
     toggleHideValues,
@@ -44,6 +46,7 @@ export default function DashboardView({ onEditTransaction }: DashboardViewProps)
 
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'scheduled' | 'completed'>('all');
   const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all');
+  const [financialView, setFinancialView] = useState<FinancialView>('realized');
 
   // States for toggle status payment
   const [transactionToComplete, setTransactionToComplete] = useState<Transaction | null>(null);
@@ -78,19 +81,25 @@ export default function DashboardView({ onEditTransaction }: DashboardViewProps)
     return num.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   };
 
-  // Filter transactions for current month
-  const monthlyTransactions = transactions.filter(t => {
-    const d = new Date(t.date + 'T12:00:00');
-    return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
-  });
+  const monthPeriod = useMemo(() => ({
+    start: `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`,
+    end: `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(new Date(currentYear, currentMonth + 1, 0).getDate()).padStart(2, '0')}`,
+  }), [currentMonth, currentYear]);
 
-  const monthlyIncome = monthlyTransactions
-    .filter(t => t.type === 'income')
-    .reduce((sum, t) => sum + t.amount, 0);
-
-  const monthlyExpense = monthlyTransactions
-    .filter(t => t.type === 'expense')
-    .reduce((sum, t) => sum + t.amount, 0);
+  const monthlyTransactions = useMemo(
+    () => getTransactionsForView(transactions, monthPeriod, 'all'),
+    [transactions, monthPeriod]
+  );
+  const realizedTotals = useMemo(
+    () => getTransactionTotals(transactions, monthPeriod, 'realized'),
+    [transactions, monthPeriod]
+  );
+  const displayedTotals = useMemo(
+    () => getTransactionTotals(transactions, monthPeriod, financialView),
+    [transactions, monthPeriod, financialView]
+  );
+  const monthlyIncome = realizedTotals.income;
+  const monthlyExpense = realizedTotals.expense;
 
   // Calculate actual account balance 
   const getActualAccountBalance = (account: Account) => {
@@ -280,6 +289,37 @@ export default function DashboardView({ onEditTransaction }: DashboardViewProps)
         </button>
       </div>
 
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="grid grid-cols-3 gap-1 rounded-xl border border-white/[0.08] bg-[#0f0f13] p-1" role="group" aria-label="Visão dos totais do mês">
+          {([
+            ['realized', 'Realizado'],
+            ['forecast', 'Previsto'],
+            ['all', 'Todos'],
+          ] as const).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={financialView === value}
+              onClick={() => setFinancialView(value)}
+              className={`min-h-11 rounded-lg px-3 text-xs font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70 active:scale-[0.98] ${
+                financialView === value
+                  ? 'bg-[#24242c] text-white'
+                  : 'text-zinc-400 hover:bg-white/[0.05] hover:text-zinc-100'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-zinc-400">
+          {financialView === 'realized'
+            ? 'Somente movimentações pagas neste mês.'
+            : financialView === 'forecast'
+              ? 'Pendentes e agendadas deste mês.'
+              : 'Todas as movimentações da competência.'}
+        </p>
+      </div>
+
       {/* Monthly Summary Cards - Clean Impeccable Design */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="bg-[#0f0f13] border border-white/[0.08] rounded-2xl p-5">
@@ -287,7 +327,7 @@ export default function DashboardView({ onEditTransaction }: DashboardViewProps)
             <TrendingUp size={15} />
             <span className="text-xs font-semibold font-mono tracking-wider">RECEITAS</span>
           </div>
-          <p className="text-2xl font-bold font-mono tabular-nums text-white">{formatVal(monthlyIncome)}</p>
+          <p className="text-2xl font-bold font-mono tabular-nums text-white">{formatVal(displayedTotals.income)}</p>
         </div>
 
         <div className="bg-[#0f0f13] border border-white/[0.08] rounded-2xl p-5">
@@ -295,7 +335,7 @@ export default function DashboardView({ onEditTransaction }: DashboardViewProps)
             <TrendingDown size={15} />
             <span className="text-xs font-semibold font-mono tracking-wider">DESPESAS</span>
           </div>
-          <p className="text-2xl font-bold font-mono tabular-nums text-white">{formatVal(monthlyExpense)}</p>
+          <p className="text-2xl font-bold font-mono tabular-nums text-white">{formatVal(displayedTotals.expense)}</p>
         </div>
 
         <div className="bg-[#0f0f13] border border-white/[0.08] rounded-2xl p-5 col-span-1 sm:col-span-1">
@@ -303,7 +343,7 @@ export default function DashboardView({ onEditTransaction }: DashboardViewProps)
             <Wallet size={15} />
             <span className="text-xs font-semibold font-mono tracking-wider">SALDO DO MÊS</span>
           </div>
-          <p className="text-2xl font-bold font-mono tabular-nums text-white">{formatVal(monthlyIncome - monthlyExpense)}</p>
+          <p className="text-2xl font-bold font-mono tabular-nums text-white">{formatVal(displayedTotals.balance)}</p>
         </div>
       </div>
 
@@ -393,8 +433,8 @@ export default function DashboardView({ onEditTransaction }: DashboardViewProps)
         currentYear={currentYear}
         hideValues={hideValues}
         onEditTransaction={onEditTransaction}
-        onToggleStatus={handleToggleStatus}
         onOpenSettings={() => setActiveTab('ajustes')}
+        onPayInvoice={payCreditCardInvoice}
       />
 
       {/* Accounts List */}
@@ -524,7 +564,7 @@ export default function DashboardView({ onEditTransaction }: DashboardViewProps)
             <button
               onClick={() => setFilterType('income')}
               className={`min-h-11 text-[10px] px-2.5 py-1 rounded-lg font-semibold uppercase tracking-wider transition ${
-                filterType === 'income' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-transparent text-zinc-400 hover:text-white border border-transparent'
+                filterType === 'income' ? 'bg-[#10251f] text-emerald-300 border border-emerald-500/30' : 'bg-transparent text-zinc-400 hover:text-white border border-transparent'
               }`}
             >
               Entradas
@@ -532,7 +572,7 @@ export default function DashboardView({ onEditTransaction }: DashboardViewProps)
             <button
               onClick={() => setFilterType('expense')}
               className={`min-h-11 text-[10px] px-2.5 py-1 rounded-lg font-semibold uppercase tracking-wider transition ${
-                filterType === 'expense' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-transparent text-zinc-400 hover:text-white border border-transparent'
+                filterType === 'expense' ? 'bg-[#281419] text-rose-300 border border-rose-500/30' : 'bg-transparent text-zinc-400 hover:text-white border border-transparent'
               }`}
             >
               Saídas
@@ -541,7 +581,7 @@ export default function DashboardView({ onEditTransaction }: DashboardViewProps)
             <button
               onClick={() => setFilterStatus(filterStatus === 'pending' ? 'all' : 'pending')}
               className={`min-h-11 text-[10px] px-2.5 py-1 rounded-lg font-semibold uppercase tracking-wider transition ${
-                filterStatus === 'pending' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-transparent text-zinc-400 hover:text-white border border-transparent'
+                filterStatus === 'pending' ? 'bg-[#2a2110] text-amber-300 border border-amber-500/30' : 'bg-transparent text-zinc-400 hover:text-white border border-transparent'
               }`}
             >
               Pendentes
@@ -549,7 +589,7 @@ export default function DashboardView({ onEditTransaction }: DashboardViewProps)
             <button
               onClick={() => setFilterStatus(filterStatus === 'scheduled' ? 'all' : 'scheduled')}
               className={`min-h-11 text-[10px] px-2.5 py-1 rounded-lg font-semibold uppercase tracking-wider transition ${
-                filterStatus === 'scheduled' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' : 'bg-transparent text-zinc-400 hover:text-white border border-transparent'
+                filterStatus === 'scheduled' ? 'bg-[#111d30] text-blue-300 border border-blue-500/30' : 'bg-transparent text-zinc-400 hover:text-white border border-transparent'
               }`}
             >
               Agendados
@@ -557,7 +597,7 @@ export default function DashboardView({ onEditTransaction }: DashboardViewProps)
             <button
               onClick={() => setFilterStatus(filterStatus === 'completed' ? 'all' : 'completed')}
               className={`min-h-11 text-[10px] px-2.5 py-1 rounded-lg font-semibold uppercase tracking-wider transition ${
-                filterStatus === 'completed' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-transparent text-zinc-400 hover:text-white border border-transparent'
+                filterStatus === 'completed' ? 'bg-[#10251f] text-emerald-300 border border-emerald-500/30' : 'bg-transparent text-zinc-400 hover:text-white border border-transparent'
               }`}
             >
               Pagos

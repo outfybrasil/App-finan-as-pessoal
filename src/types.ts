@@ -1,4 +1,5 @@
 export type TransactionType = 'income' | 'expense';
+export type TransactionKind = 'transaction' | 'card_purchase' | 'invoice_payment';
 
 export interface InstallmentInfo {
   current: number;
@@ -21,6 +22,9 @@ export interface Transaction {
   isInstallment: boolean;
   installmentInfo?: InstallmentInfo;
   originalAmount?: number;
+  kind?: TransactionKind;
+  creditCardId?: string;
+  invoiceId?: string;
 }
 
 export interface Account {
@@ -33,6 +37,8 @@ export interface Account {
   creditLimit?: number;
   closingDay?: number;
   dueDay?: number;
+  paymentAccountId?: string;
+  minimumPaymentRate?: number;
   userId?: string;
 }
 
@@ -50,4 +56,27 @@ export interface MarketItem {
   estimatedPrice: number;
   quantity: number;
   inCart: boolean;
+  listId?: string;
+  category?: string;
+  store?: string;
+  order?: number;
+  lastPurchasedPrice?: number;
+}
+
+export interface SavingsGoalActivity {
+  id: string;
+  type: 'contribution' | 'withdrawal';
+  amount: number;
+  date: string;
+}
+
+export interface SavingsGoal {
+  id: string;
+  name: string;
+  targetAmount: number;
+  currentAmount: number;
+  monthlyContribution: number;
+  accountId: string;
+  targetDate?: string;
+  activities: SavingsGoalActivity[];
 }

@@ -43,11 +43,11 @@ resultados verificáveis.
 Tarefas:
 
 - [ ] Rotacionar a chave `service_role`.
-- [ ] Confirmar que nenhum segredo está no histórico do Git.
+- [x] Auditar arquivos rastreados e histórico do Git por padrões de segredos.
 - [ ] Aplicar Supabase Auth e RLS por usuário.
 - [ ] Criar dados de teste com contas, cartões, parcelas e meses diferentes.
-- [ ] Cobrir regras financeiras críticas com testes.
-- [ ] Documentar a regra de competência, vencimento e pagamento.
+- [x] Cobrir seletores de totais/status e regras de datas com testes unitários.
+- [x] Documentar a regra inicial de competência, vencimento e pagamento.
 
 Critérios de aceite:
 
@@ -56,6 +56,12 @@ Critérios de aceite:
 - nenhuma chave administrativa chega ao bundle do navegador;
 - os mesmos dados sempre geram os mesmos totais.
 
+Auditoria local de 31 de julho de 2026: `.env` está ignorado e não é rastreado;
+o frontend referencia apenas `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`.
+O único uso rastreado de `service_role` está neste documento, inclusive no
+commit que o introduziu, sem valor de credencial. A rotação no painel e a
+aplicação da migração Auth/RLS continuam dependendo do ambiente Supabase.
+
 ### Fase 1 — Confiabilidade dos totais
 
 Objetivo: corrigir os conceitos usados no Dashboard, Poupança e Relatórios antes
@@ -63,16 +69,23 @@ de criar novas projeções.
 
 Tarefas:
 
-- [ ] Separar movimentações `pagas`, `pendentes`, `agendadas` e `atrasadas`.
-- [ ] Separar indicadores `Realizado`, `Previsto` e `Todos`.
-- [ ] Definir qual data determina o mês: competência, vencimento ou pagamento.
+- [x] Separar movimentações `pagas`, `pendentes`, `agendadas` e `atrasadas`.
+- [x] Separar indicadores `Realizado`, `Previsto` e `Todos` no Dashboard.
+- [x] Definir qual data determina o mês: competência, vencimento ou pagamento.
 - [ ] Manter movimentações pagas visíveis e apenas alterar seu status.
-- [ ] Calcular receitas, despesas e saldo usando o filtro de período ativo.
+- [x] Calcular receitas, despesas e saldo usando o filtro de período ativo no Dashboard, Movimentações e Relatórios.
 - [ ] Identificar explicitamente contas de reserva/investimento.
 - [ ] Remover a regra que trata todas as contas como poupança.
 - [ ] Informar taxa, data de referência e regra de tributação nas projeções.
-- [ ] Remover ano fixo nos relatórios.
+- [x] Remover ano fixo nos relatórios.
 - [ ] Permitir abrir um total e consultar as movimentações que o compõem.
+
+Regra adotada na primeira versão: `Transaction.date` representa a competência e
+determina em qual mês a movimentação aparece. `paymentDate` registra quando a
+movimentação foi efetivada, mas não a transfere para outro mês. `Realizado`
+inclui somente status `completed`; `Previsto` inclui `pending` e `scheduled`;
+`Todos` reúne os dois conjuntos. `overdue` é derivado quando uma movimentação
+não paga tem data anterior a hoje e não é persistido no banco.
 
 Critérios de aceite:
 
@@ -220,6 +233,11 @@ Versão posterior:
 
 Objetivo: organizar compras, faturas e pagamentos por cartão.
 
+Status: concluída em 31 de julho de 2026. A implementação inclui migração
+compatível em `credit-card-migration.sql`, regras determinísticas em
+`src/lib/creditCards.ts`, testes de fechamento/vencimento/limite, navegação por
+faturas e simulação de pagamentos total, parcial, mínimo ou personalizado.
+
 Modelo sugerido:
 
 - conta bancária e cartão são entidades diferentes;
@@ -253,23 +271,33 @@ Critérios de aceite:
 
 ### Fase 4 — Calendário e Movimentações
 
+Status: concluída em 31 de julho de 2026, com projeção diária, filtros,
+agrupamento por conta/cartão, seleção múltipla, cenário conjunto, desfazer para
+mudanças integrais de status e controles principais com alvos de 44 px.
+
 Tarefas:
 
-- [ ] Adicionar filtros `Todos`, `Pagos`, `Pendentes`, `Agendados` e
+- [x] Adicionar filtros `Todos`, `Pagos`, `Pendentes`, `Agendados` e
   `Atrasados`.
-- [ ] Criar legenda para os indicadores do calendário.
-- [ ] Adicionar botão `Hoje`.
-- [ ] Mostrar saldo previsto ao fim de cada dia.
-- [ ] Permitir selecionar várias contas e criar um cenário.
-- [ ] Trocar `Lançar hoje` por uma ação que use a data selecionada.
-- [ ] Oferecer `Desfazer` após mudança de status.
-- [ ] Agrupar movimentações por conta ou cartão.
-- [ ] Indexar movimentações por data com `useMemo`.
-- [ ] Adicionar nomes acessíveis, foco visível e alvos de toque de 44 px.
+- [x] Criar legenda para os indicadores do calendário.
+- [x] Adicionar botão `Hoje`.
+- [x] Mostrar saldo previsto ao fim de cada dia.
+- [x] Permitir selecionar várias movimentações e criar um cenário conjunto.
+- [x] Trocar `Lançar hoje` por uma ação que use a data selecionada.
+- [x] Oferecer `Desfazer` após mudança integral de status.
+- [x] Agrupar movimentações por conta ou cartão.
+- [x] Indexar movimentações por data com `useMemo`.
+- [x] Adicionar nomes acessíveis, foco visível e alvos de toque de 44 px.
 
 ### Fase 5 — Reservas e metas
 
 Transformar `Poupança` em `Reservas e metas`.
+
+Status: concluída em 31 de julho de 2026. Metas são persistidas localmente por
+usuário, vinculadas a contas, possuem aporte planejado, projeção sem rendimento
+presumido, histórico de aportes/retiradas e simulação de retirada pelo motor de
+cenários. `Total guardado` considera somente contas `savings`, `reserve` ou
+`investment`.
 
 Cada meta deve mostrar:
 
@@ -288,19 +316,23 @@ realizado.
 
 ### Fase 6 — Lista de compras
 
+Status: concluída no aplicativo em 31 de julho de 2026. Listas e seus metadados
+são mantidos localmente; os campos dos itens podem ser sincronizados após a
+execução de `shopping-lists-migration.sql` no Supabase.
+
 Tarefas:
 
-- [ ] Suportar várias listas.
-- [ ] Criar listas recorrentes.
-- [ ] Agrupar por mercado ou categoria.
-- [ ] Reordenar itens.
-- [ ] Duplicar uma lista anterior.
-- [ ] Comparar o preço com a última compra.
-- [ ] Limpar itens comprados.
-- [ ] Revisar exatamente quais itens serão lançados.
-- [ ] Escolher conta ou cartão antes da confirmação.
-- [ ] Mostrar impacto no saldo seguro.
-- [ ] Corrigir semântica, foco e fechamento do modal.
+- [x] Suportar várias listas.
+- [x] Criar listas recorrentes.
+- [x] Agrupar por mercado ou categoria.
+- [x] Reordenar itens.
+- [x] Duplicar uma lista anterior.
+- [x] Comparar o preço com a última compra.
+- [x] Limpar itens comprados.
+- [x] Revisar exatamente quais itens serão lançados.
+- [x] Escolher conta ou cartão antes da confirmação.
+- [x] Mostrar impacto no saldo seguro.
+- [x] Corrigir semântica, foco e fechamento do modal.
 
 O botão deve informar quantidade e total:
 
@@ -309,6 +341,10 @@ Revisar 4 itens — R$ 187,40
 ```
 
 ### Fase 7 — Relatórios
+
+Status: primeira versão funcional concluída em 31 de julho de 2026, com filtros
+combináveis, comparação anual, indicadores futuros, exportação CSV,
+impressão/salvamento em PDF, tabela textual e privacidade integral do gráfico.
 
 Adicionar:
 
@@ -329,6 +365,11 @@ Quando o modo de privacidade estiver ativo, ocultar também proporções e
 magnitudes que revelem valores nos gráficos.
 
 ### Fase 8 — Ajustes
+
+Status: estrutura existente ampliada em 31 de julho de 2026 com edição completa
+dos cartões, tipos de reserva/investimento, backup JSON, estado de sincronização
+e bloqueio de exclusões com dados vinculados. A configuração técnica permanece
+restrita ao bloco próprio de conexão.
 
 Dividir a tela em:
 
@@ -506,10 +547,10 @@ Ao retomar o trabalho:
 1. rotacionar as credenciais;
 2. criar uma suíte de dados financeiros de teste;
 3. corrigir os seletores de totais e status;
-4. definir os tipos do Planejador de Cenários;
-5. implementar `simulateScenario` com testes;
-6. criar a primeira interface de comparação;
-7. integrar a ação `Simular pagamento` às Movimentações;
+4. [x] definir os tipos do Planejador de Cenários;
+5. [x] implementar `simulateScenario` com testes;
+6. [x] criar a primeira interface de comparação;
+7. [x] integrar a ação `Simular pagamento` às Movimentações;
 8. somente depois adicionar explicações por IA.
 
 Esse bloco cria uma base segura para Calendário, Cartões, Poupança e Relatórios

@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import SelectAccountModal from './SelectAccountModal';
 import ConfirmDeleteModal from './ConfirmDeleteModal';
 import { useFinanceStore } from '../store';
 import { ChevronLeft, ChevronRight, Edit3, Trash2, Calendar as CalendarIcon, TrendingUp, TrendingDown, Plus } from 'lucide-react';
 import { Transaction } from '../types';
+import { getDailyProjectedBalances, getLocalIsoDate, getTransactionEffectiveStatus, type EffectiveTransactionStatus } from '../lib/finance';
 
 interface CalendarViewProps {
   onEditTransaction: (t: Transaction) => void;
@@ -24,6 +25,7 @@ export default function CalendarView({ onEditTransaction, onOpenNewTransactionWi
     editTransaction,
     payTransaction
   } = useFinanceStore();
+  const [statusFilter, setStatusFilter] = useState<'all' | EffectiveTransactionStatus>('all');
 
   const monthsNames = [
     'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -84,12 +86,24 @@ export default function CalendarView({ onEditTransaction, onOpenNewTransactionWi
     });
   }
 
+  const transactionsByDate = useMemo(() => transactions.reduce((index, transaction) => {
+    (index[transaction.date] ||= []).push(transaction);
+    return index;
+  }, {} as Record<string, Transaction[]>), [transactions]);
+  const monthPeriod = useMemo(() => ({
+    start: `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`,
+    end: `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(totalDays).padStart(2, '0')}`,
+  }), [currentMonth, currentYear, totalDays]);
+  const dailyBalances = useMemo(() => getDailyProjectedBalances(accounts, transactions, monthPeriod), [accounts, monthPeriod, transactions]);
+
+  const matchesStatus = (transaction: Transaction) => statusFilter === 'all' || getTransactionEffectiveStatus(transaction) === statusFilter;
+
   // Get selected day transactions
-  const selectedDayTransactions = transactions.filter(t => t.date === selectedDate);
+  const selectedDayTransactions = (transactionsByDate[selectedDate] || []).filter(matchesStatus);
 
   // Helper: check transactions for a specific date and return indicators
   const getDateIndicators = (dateStr: string) => {
-    const dayTrans = transactions.filter(t => t.date === dateStr);
+    const dayTrans = (transactionsByDate[dateStr] || []).filter(matchesStatus);
     
     return {
       hasIncome: dayTrans.some(t => t.type === 'income'),
@@ -140,6 +154,13 @@ export default function CalendarView({ onEditTransaction, onOpenNewTransactionWi
     return `${day} de ${monthsNames[month]} de ${year}`;
   };
 
+  const goToToday = () => {
+    const today = getLocalIsoDate();
+    const [year, month] = today.split('-').map(Number);
+    setCurrentMonthYear(month - 1, year);
+    setSelectedDate(today);
+  };
+
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-24">
       
@@ -147,21 +168,37 @@ export default function CalendarView({ onEditTransaction, onOpenNewTransactionWi
       <div className="flex items-center justify-between glass-card p-2.5 rounded-2xl">
         <button 
           onClick={handlePrevMonth}
-          className="p-2 hover:bg-dark-bg rounded-xl text-gray-400 hover:text-white transition"
+          className="min-h-11 min-w-11 p-2 hover:bg-dark-bg rounded-xl text-gray-400 hover:text-white transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70"
         >
           <ChevronLeft size={20} />
         </button>
         
-        <span className="font-display font-bold text-white text-base">
-          {monthsNames[currentMonth]} de {currentYear}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="font-display font-bold text-white text-base">{monthsNames[currentMonth]} de {currentYear}</span>
+          <button type="button" onClick={goToToday} className="min-h-11 rounded-xl border border-white/[0.08] px-3 text-xs font-semibold text-zinc-300 transition hover:bg-white/[0.05] hover:text-white">Hoje</button>
+        </div>
         
         <button 
           onClick={handleNextMonth}
-          className="p-2 hover:bg-dark-bg rounded-xl text-gray-400 hover:text-white transition"
+          className="min-h-11 min-w-11 p-2 hover:bg-dark-bg rounded-xl text-gray-400 hover:text-white transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70"
         >
           <ChevronRight size={20} />
         </button>
+      </div>
+
+      <div className="space-y-3">
+        <div className="grid grid-cols-5 gap-1 rounded-xl border border-white/[0.08] bg-[#0f0f13] p-1" role="group" aria-label="Filtrar calendário por situação">
+          {([
+            ['all', 'Todos'], ['completed', 'Pagos'], ['pending', 'Pendentes'], ['scheduled', 'Agendados'], ['overdue', 'Atrasados'],
+          ] as const).map(([value, label]) => (
+            <button key={value} type="button" aria-pressed={statusFilter === value} onClick={() => setStatusFilter(value)} className={`min-h-11 rounded-lg px-1 text-[10px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70 ${statusFilter === value ? 'bg-[#24242c] text-white' : 'text-zinc-400 hover:bg-white/[0.05] hover:text-white'}`}>{label}</button>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-zinc-400" aria-label="Legenda do calendário">
+          <span className="flex items-center gap-2"><i className="h-2 w-2 rounded-full bg-emerald-400" />Receita</span>
+          <span className="flex items-center gap-2"><i className="h-2 w-2 rounded-full bg-rose-400" />Despesa</span>
+          <span className="flex items-center gap-2"><i className="h-2 w-2 rounded-full bg-amber-400" />Fixa ou parcelada</span>
+        </div>
       </div>
 
       {/* Calendar Grid Container */}
@@ -184,6 +221,7 @@ export default function CalendarView({ onEditTransaction, onOpenNewTransactionWi
 
             const { dateStr, day } = cell;
             const isSelected = selectedDate === dateStr;
+            const isToday = getLocalIsoDate() === dateStr;
             
             // Get dots/indicators
             const { hasIncome, hasExpense, hasSpecial } = getDateIndicators(dateStr || '');
@@ -192,10 +230,11 @@ export default function CalendarView({ onEditTransaction, onOpenNewTransactionWi
               <button
                 key={cell.key}
                 onClick={() => setSelectedDate(dateStr || '')}
+                aria-label={`${day} de ${monthsNames[currentMonth]}${isToday ? ', hoje' : ''}`}
                 className={`aspect-square rounded-xl sm:rounded-2xl flex flex-col items-center justify-between p-0.5 xs:p-1 sm:p-1.5 transition relative select-none outline-none ${
                   isSelected 
                     ? 'bg-emerald-accent text-black font-extrabold shadow-lg shadow-emerald-accent/15' 
-                    : 'glass-card-interactive text-gray-400 hover:text-white'
+                    : `glass-card-interactive text-gray-400 hover:text-white ${isToday ? 'ring-1 ring-emerald-400/70' : ''}`
                 }`}
               >
                 {/* Special highlight for today's physical date */}
@@ -215,6 +254,9 @@ export default function CalendarView({ onEditTransaction, onOpenNewTransactionWi
                     <span className={`w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full ${isSelected ? 'bg-black/40' : 'bg-pink-accent'}`}></span>
                   )}
                 </div>
+                <span className={`hidden text-[7px] font-mono tabular-nums leading-none sm:block ${isSelected ? 'text-black/70' : 'text-zinc-500'}`}>
+                  {hideValues ? '•••' : new Intl.NumberFormat('pt-BR', { notation: 'compact', maximumFractionDigits: 1 }).format(dailyBalances[dateStr || ''] || 0)}
+                </span>
               </button>
             );
           })}
@@ -231,10 +273,10 @@ export default function CalendarView({ onEditTransaction, onOpenNewTransactionWi
           
           <button
             onClick={() => onOpenNewTransactionWithDate(selectedDate)}
-            className="px-3 py-1.5 bg-emerald-accent/10 hover:bg-emerald-accent/15 border border-emerald-accent/15 text-emerald-accent rounded-xl text-xs flex items-center gap-1 font-display transition"
+            className="min-h-11 px-3 py-1.5 bg-emerald-accent/10 hover:bg-emerald-accent/15 border border-emerald-accent/15 text-emerald-accent rounded-xl text-xs flex items-center gap-1 font-display transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70"
           >
             <Plus size={12} strokeWidth={2.5} />
-            <span>Lançar hoje</span>
+            <span>Lançar nesta data</span>
           </button>
         </div>
 
@@ -249,6 +291,7 @@ export default function CalendarView({ onEditTransaction, onOpenNewTransactionWi
               const account = accounts.find(a => a.id === t.accountId);
               const isExpense = t.type === 'expense';
               const isCompleted = t.status === 'completed';
+              const effectiveStatus = getTransactionEffectiveStatus(t);
 
               return (
                 <div 
@@ -307,30 +350,35 @@ export default function CalendarView({ onEditTransaction, onOpenNewTransactionWi
                       
                       <button 
                         onClick={() => handleToggleStatus(t)}
+                        disabled={t.kind === 'card_purchase'}
                         className={`text-[9px] font-mono font-bold mt-0.5 px-1.5 py-0.5 rounded-md transition ${
-                          t.status === 'completed'
+                          t.kind === 'card_purchase'
+                            ? 'bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 cursor-default'
+                          : effectiveStatus === 'completed'
                             ? 'bg-emerald-accent/10 text-emerald-accent border border-emerald-accent/15'
-                            : t.status === 'scheduled'
+                            : effectiveStatus === 'overdue'
+                              ? 'bg-[#281419] text-rose-300 border border-rose-500/25'
+                            : effectiveStatus === 'scheduled'
                               ? 'bg-blue-500/10 text-blue-500 border border-blue-500/15'
                               : 'bg-amber-500/10 text-amber-500 border border-amber-500/15'
                         }`}
-                        title="Alternar situação"
+                        title={t.kind === 'card_purchase' ? 'O pagamento é controlado pela fatura' : 'Alternar situação'}
                       >
-                        {t.status === 'completed' ? 'PAGO' : t.status === 'scheduled' ? 'AGENDADO' : 'PENDENTE'}
+                        {t.kind === 'card_purchase' ? 'NA FATURA' : effectiveStatus === 'completed' ? 'PAGO' : effectiveStatus === 'overdue' ? 'ATRASADO' : effectiveStatus === 'scheduled' ? 'AGENDADO' : 'PENDENTE'}
                       </button>
                     </div>
 
                     <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                       <button
                         onClick={() => onEditTransaction(t)}
-                        className="p-2 hover:bg-dark-bg text-gray-400 hover:text-white rounded-lg transition"
+                        className="min-h-11 min-w-11 p-2 hover:bg-dark-bg text-gray-400 hover:text-white rounded-lg transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70"
                         title="Editar"
                       >
                         <Edit3 size={14} />
                       </button>
                       <button
                         onClick={() => handleDelete(t)}
-                        className="p-2 hover:bg-dark-bg text-gray-400 hover:text-pink-accent rounded-lg transition"
+                        className="min-h-11 min-w-11 p-2 hover:bg-dark-bg text-gray-400 hover:text-pink-accent rounded-lg transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400/70"
                         title="Excluir"
                       >
                         <Trash2 size={14} />

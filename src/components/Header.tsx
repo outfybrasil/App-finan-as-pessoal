@@ -76,7 +76,7 @@ export default function Header({ onOpenNewTransaction }: HeaderProps) {
 
               <button 
                 onClick={onOpenNewTransaction}
-                className="bg-emerald-500 hover:bg-emerald-400 text-zinc-950 px-3.5 py-2 rounded-xl font-semibold text-xs flex items-center gap-1.5 transition duration-150 active:scale-[0.97] font-display shadow-sm"
+                className="bg-emerald-500 hover:bg-emerald-400 text-[#07110e] px-3.5 py-2 rounded-xl font-semibold text-xs flex items-center gap-1.5 transition duration-150 active:scale-[0.97] font-display shadow-sm"
               >
                 <Plus size={15} strokeWidth={2.5} />
                 <span>Nova Transação</span>
@@ -104,7 +104,7 @@ export default function Header({ onOpenNewTransaction }: HeaderProps) {
               
               <button 
                 onClick={onOpenNewTransaction}
-                className="bg-emerald-500 hover:bg-emerald-400 text-zinc-950 px-3.5 py-2 rounded-xl font-semibold text-xs flex items-center gap-1.5 transition duration-150 active:scale-[0.97] font-display shadow-sm"
+                className="bg-emerald-500 hover:bg-emerald-400 text-[#07110e] px-3.5 py-2 rounded-xl font-semibold text-xs flex items-center gap-1.5 transition duration-150 active:scale-[0.97] font-display shadow-sm"
               >
                 <Plus size={15} strokeWidth={2.5} />
                 <span>Nova Transação</span>
@@ -131,7 +131,7 @@ export default function Header({ onOpenNewTransaction }: HeaderProps) {
               
               <button 
                 onClick={onOpenNewTransaction}
-                className="bg-emerald-500 hover:bg-emerald-400 text-zinc-950 px-3.5 py-2 rounded-xl font-semibold text-xs flex items-center gap-1.5 transition duration-150 active:scale-[0.97] font-display shadow-sm"
+                className="bg-emerald-500 hover:bg-emerald-400 text-[#07110e] px-3.5 py-2 rounded-xl font-semibold text-xs flex items-center gap-1.5 transition duration-150 active:scale-[0.97] font-display shadow-sm"
               >
                 <Plus size={15} strokeWidth={2.5} />
                 <span>Nova Transação</span>
@@ -144,7 +144,7 @@ export default function Header({ onOpenNewTransaction }: HeaderProps) {
         return (
           <div className="flex flex-col md:flex-row md:items-center justify-between w-full gap-4">
             <div>
-              <h1 className="text-2xl font-bold font-display tracking-tight text-white">Poupança & Investimentos</h1>
+              <h1 className="text-2xl font-bold font-display tracking-tight text-white">Reservas e metas</h1>
               <p className="text-zinc-400 text-xs mt-0.5">Acompanhamento da reserva de emergência e rendimentos</p>
             </div>
             

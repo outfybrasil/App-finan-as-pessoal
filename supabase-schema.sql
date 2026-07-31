@@ -7,6 +7,8 @@ CREATE TABLE IF NOT EXISTS accounts (
   credit_limit numeric,
   closing_day integer,
   due_day integer,
+  payment_account_id text,
+  minimum_payment_rate numeric,
   user_id text
 );
 
@@ -38,6 +40,10 @@ CREATE TABLE IF NOT EXISTS transactions (
   is_fixed boolean,
   is_installment boolean,
   installment_info jsonb
+  ,payment_date text
+  ,kind text
+  ,credit_card_id text
+  ,invoice_id text
 );
 
 CREATE TABLE IF NOT EXISTS market_items (
@@ -45,7 +51,12 @@ CREATE TABLE IF NOT EXISTS market_items (
   name text NOT NULL,
   estimated_price numeric,
   quantity numeric,
-  in_cart boolean
+  in_cart boolean,
+  list_id text DEFAULT 'default',
+  category text,
+  store text,
+  item_order integer,
+  last_purchased_price numeric
 );
 
 -- Set up Row Level Security (RLS) to allow public access (since the app currently uses anon keys without user login)

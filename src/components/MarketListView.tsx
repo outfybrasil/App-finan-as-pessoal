@@ -1,341 +1,51 @@
-import { useState, FormEvent } from 'react';
+import { FormEvent, useMemo, useState } from 'react';
 import { useFinanceStore } from '../store';
-import { Plus, Trash2, ShoppingBag, ShoppingCart, Check, Calculator } from 'lucide-react';
-import { MarketItem } from '../types';
+import { Check, ChevronDown, ChevronUp, Copy, Plus, ShoppingBag, ShoppingCart, Trash2, X } from 'lucide-react';
+
+type ListMeta = { id: string; name: string; recurring: boolean };
+const META_KEY = 'finance-shopping-lists-v1';
+const loadLists = (): ListMeta[] => { try { const saved = JSON.parse(localStorage.getItem(META_KEY) || '[]'); return saved.length ? saved : [{ id: 'default', name: 'Compras do mês', recurring: true }]; } catch { return [{ id: 'default', name: 'Compras do mês', recurring: true }]; } };
+const money = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 export default function MarketListView() {
-  const { 
-    marketItems, 
-    accounts,
-    addMarketItem, 
-    toggleMarketItemInCart, 
-    deleteMarketItem, 
-    updateMarketItem,
-    convertMarketListToExpense 
-  } = useFinanceStore();
+  const { marketItems, accounts, addMarketItem, toggleMarketItemInCart, deleteMarketItem, updateMarketItem, convertMarketListToExpense } = useFinanceStore();
+  const [lists, setLists] = useState<ListMeta[]>(loadLists);
+  const [activeId, setActiveId] = useState(lists[0].id);
+  const [name, setName] = useState(''); const [price, setPrice] = useState(''); const [quantity, setQuantity] = useState(1); const [category, setCategory] = useState('Outros'); const [store, setStore] = useState('');
+  const [checkout, setCheckout] = useState(false); const [destination, setDestination] = useState(accounts[0]?.id || '');
+  const items = useMemo(() => marketItems.filter((i) => (i.listId || 'default') === activeId), [marketItems, activeId]);
+  const checked = items.filter((i) => i.inCart); const total = checked.reduce((s, i) => s + i.quantity * i.estimatedPrice, 0);
+  const selectedAccount = accounts.find((a) => a.id === destination); const safeAfter = selectedAccount && selectedAccount.type !== 'credit' ? selectedAccount.balance - total : null;
+  const saveLists = (next: ListMeta[]) => { setLists(next); localStorage.setItem(META_KEY, JSON.stringify(next)); };
+  const createList = () => { const listName = prompt('Nome da nova lista:')?.trim(); if (!listName) return; const next = { id: `list-${Date.now()}`, name: listName, recurring: false }; saveLists([...lists, next]); setActiveId(next.id); };
+  const duplicate = () => { const source = lists.find((l) => l.id === activeId); if (!source) return; const next = { id: `list-${Date.now()}`, name: `${source.name} — cópia`, recurring: source.recurring }; saveLists([...lists, next]); items.forEach((i, index) => addMarketItem(i.name, i.estimatedPrice, i.quantity, { listId: next.id, category: i.category, store: i.store, order: index, lastPurchasedPrice: i.estimatedPrice })); setActiveId(next.id); };
+  const removeList = () => { if (lists.length === 1 || !confirm('Excluir esta lista e seus itens?')) return; items.forEach((i) => deleteMarketItem(i.id)); const next = lists.filter((l) => l.id !== activeId); saveLists(next); setActiveId(next[0].id); };
+  const submit = (e: FormEvent) => { e.preventDefault(); if (!name.trim()) return; addMarketItem(name.trim(), Number(price.replace(',', '.')) || 0, quantity, { listId: activeId, category, store, order: items.length }); setName(''); setPrice(''); setQuantity(1); };
+  const move = (index: number, delta: number) => { const other = items[index + delta]; if (!other) return; const copy = [...marketItems]; const a = copy.findIndex((i) => i.id === items[index].id); const b = copy.findIndex((i) => i.id === other.id); [copy[a], copy[b]] = [copy[b], copy[a]]; useFinanceStore.setState({ marketItems: copy }); };
 
-  const [isAdding, setIsAdding] = useState(false);
-  const [newItemName, setNewItemName] = useState('');
-  const [newItemPrice, setNewItemPrice] = useState('');
-  const [newItemQty, setNewItemQty] = useState(1);
-  
-  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
-  const [selectedAccountId, setSelectedAccountId] = useState(accounts[0]?.id || '');
-
-  const handleAddItem = (e: FormEvent) => {
-    e.preventDefault();
-    if (!newItemName.trim()) return;
-
-    const price = parseFloat(newItemPrice.replace(/\./g, '').replace(',', '.')) || 0;
-    addMarketItem(newItemName.trim(), price, newItemQty);
-    
-    setNewItemName('');
-    setNewItemPrice('');
-    setNewItemQty(1);
-    setIsAdding(false);
-  };
-
-  const totalItems = marketItems.length;
-  const itemsInCart = marketItems.filter(i => i.inCart).length;
-  
-  const itemsToSum = itemsInCart > 0 ? marketItems.filter(i => i.inCart) : marketItems;
-  const totalEstimated = itemsToSum.reduce((sum, item) => sum + (item.estimatedPrice * item.quantity), 0);
-
-  const incrementQty = (item: MarketItem) => {
-    updateMarketItem(item.id, item.quantity + 1, item.estimatedPrice);
-  };
-
-  const decrementQty = (item: MarketItem) => {
-    if (item.quantity > 1) {
-      updateMarketItem(item.id, item.quantity - 1, item.estimatedPrice);
-    }
-  };
-
-  const handlePriceChange = (id: string, qty: number, priceStr: string) => {
-    const digits = priceStr.replace(/\D/g, '');
-    const price = digits ? (parseInt(digits, 10) / 100) : 0;
-    updateMarketItem(id, qty, price);
-  };
-
-  const handleFinalizeCheckout = () => {
-    if (!selectedAccountId) return;
-    convertMarketListToExpense(selectedAccountId);
-    setIsCheckoutOpen(false);
-  };
-
-  return (
-    <div className="space-y-6 max-w-4xl mx-auto pb-20">
-      
-      {/* Total Estimated Card */}
-      <div className="bg-[#0f0f13] border border-white/[0.08] rounded-2xl p-6">
-        <div className="flex items-center gap-4">
-          <div className="w-11 h-11 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center justify-center text-emerald-400 shrink-0">
-            <Calculator size={20} />
-          </div>
-          <div>
-            <p className="text-zinc-400 text-xs font-mono uppercase tracking-wider mb-0.5">
-              Total Estimado {itemsInCart > 0 ? '(No Carrinho)' : '(Lista Completa)'}
-            </p>
-            <h2 className="text-3xl font-bold font-mono tabular-nums text-white tracking-tight">
-              R$ {totalEstimated.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </h2>
-          </div>
-        </div>
-      </div>
-
-      {/* Button to show inline add form */}
-      {!isAdding ? (
-        <button
-          onClick={() => setIsAdding(true)}
-          className="w-full py-3.5 bg-[#0f0f13] border border-dashed border-white/[0.16] hover:border-emerald-500/50 rounded-2xl text-emerald-400 hover:text-emerald-300 transition duration-150 active:scale-[0.98] flex items-center justify-center gap-2 text-xs font-semibold font-display"
-        >
-          <Plus size={15} strokeWidth={2.5} />
-          <span>ADICIONAR ITEM NA LISTA</span>
-        </button>
-      ) : (
-        <form onSubmit={handleAddItem} className="bg-[#0f0f13] border border-white/[0.08] rounded-2xl p-4 space-y-4">
-          <div className="flex items-center justify-between pb-2 border-b border-white/[0.06]">
-            <h4 className="text-xs font-bold text-white uppercase tracking-wider">Novo Item de Mercado</h4>
-            <button 
-              type="button" 
-              onClick={() => setIsAdding(false)}
-              className="text-zinc-400 hover:text-white text-xs"
-            >
-              Cancelar
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label htmlFor="market-product" className="block text-[10px] text-zinc-400 font-mono uppercase mb-1">Produto</label>
-              <input
-                id="market-product"
-                type="text"
-                placeholder="Ex: Leite, Café, Frutas..."
-                value={newItemName}
-                onChange={(e) => setNewItemName(e.target.value)}
-                className="w-full glass-input px-3 py-2 text-xs text-white placeholder-zinc-600 focus:border-emerald-400"
-                required
-                autoFocus
-              />
-            </div>
-            
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label htmlFor="market-price" className="block text-[10px] text-zinc-400 font-mono uppercase mb-1">Preço Est. (R$)</label>
-                <input
-                  id="market-price"
-                  type="text"
-                  inputMode="numeric"
-                  placeholder="0,00"
-                  value={newItemPrice}
-                  onChange={(e) => {
-                    const digits = e.target.value.replace(/\D/g, '');
-                    if (!digits) {
-                      setNewItemPrice('');
-                    } else {
-                      const num = parseInt(digits, 10) / 100;
-                      setNewItemPrice(num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
-                    }
-                  }}
-                  className="w-full glass-input px-3 py-2 text-xs font-mono text-white placeholder-zinc-600 focus:border-emerald-400"
-                />
-              </div>
-              <div>
-                <span id="market-quantity-label" className="block text-[10px] text-zinc-400 font-mono uppercase mb-1">Qtd</span>
-                <div className="flex items-center glass-input h-[44px] px-1" role="group" aria-labelledby="market-quantity-label">
-                  <button 
-                    type="button"
-                    aria-label="Diminuir quantidade"
-                    onClick={() => setNewItemQty(Math.max(1, newItemQty - 1))}
-                    className="w-11 h-11 text-zinc-400 hover:text-white flex items-center justify-center text-xs"
-                  >
-                    -
-                  </button>
-                  <span className="flex-1 text-center text-xs font-mono text-white font-bold">{newItemQty}</span>
-                  <button 
-                    type="button"
-                    aria-label="Aumentar quantidade"
-                    onClick={() => setNewItemQty(newItemQty + 1)}
-                    className="w-11 h-11 text-zinc-400 hover:text-white flex items-center justify-center text-xs"
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-end">
-              <button
-                type="submit"
-                className="w-full py-2 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-semibold font-display rounded-xl text-xs transition duration-150 active:scale-[0.98]"
-              >
-                Adicionar
-              </button>
-            </div>
-          </div>
-        </form>
-      )}
-
-      {/* Stats header */}
-      <div className="flex justify-between items-center text-[11px] font-mono text-zinc-400 uppercase tracking-wider px-1">
-        <span>{totalItems} Produtos na lista</span>
-        <span>{itemsInCart} No Carrinho</span>
-      </div>
-
-      {/* Main Items list */}
-      {marketItems.length === 0 ? (
-        <div className="bg-[#0f0f13] border border-white/[0.08] rounded-2xl py-12 px-6 text-center flex flex-col items-center justify-center">
-          <ShoppingBag size={28} className="text-zinc-600 mb-2" />
-          <h3 className="text-sm font-bold text-white">Lista de Mercado Vazia</h3>
-          <p className="text-xs text-zinc-400 mt-1">Adicione itens para planejar suas compras de supermercado.</p>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {marketItems.map(item => (
-            <div 
-              key={item.id}
-              className={`rounded-2xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition border ${
-                item.inCart 
-                  ? 'border-emerald-500/20 bg-emerald-500/5' 
-                  : 'border-white/[0.08] bg-[#0f0f13] hover:border-white/[0.16]'
-              }`}
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                <button
-                  onClick={() => toggleMarketItemInCart(item.id)}
-                  className={`w-5 h-5 rounded-md flex items-center justify-center transition shrink-0 border ${
-                    item.inCart
-                      ? 'bg-emerald-500 border-emerald-500 text-zinc-950'
-                      : 'border-white/[0.2] bg-transparent text-transparent hover:border-white/40'
-                  }`}
-                >
-                  <Check size={12} strokeWidth={3} />
-                </button>
-
-                <div className="min-w-0">
-                  <h4 className={`text-xs font-semibold tracking-tight truncate ${
-                    item.inCart ? 'line-through text-zinc-500' : 'text-white'
-                  }`}>
-                    {item.name}
-                  </h4>
-                  <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-zinc-400 font-mono">
-                    <span>Qtd: {item.quantity}</span>
-                    <span>•</span>
-                    <span>Uni: R$ {item.estimatedPrice.toFixed(2)}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between sm:justify-end gap-3 border-t border-white/[0.04] pt-2 sm:border-t-0 sm:pt-0">
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center bg-[#16161d] border border-white/[0.08] rounded-md h-[26px] px-0.5">
-                    <button 
-                      onClick={() => decrementQty(item)}
-                      className="w-4 h-4 text-zinc-400 hover:text-white flex items-center justify-center text-xs"
-                    >
-                      -
-                    </button>
-                    <span className="w-5 text-center text-[10px] font-mono font-bold text-white">{item.quantity}</span>
-                    <button 
-                      onClick={() => incrementQty(item)}
-                      className="w-4 h-4 text-zinc-400 hover:text-white flex items-center justify-center text-xs"
-                    >
-                      +
-                    </button>
-                  </div>
-
-                  <div className="relative w-16">
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={item.estimatedPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      onChange={(e) => handlePriceChange(item.id, item.quantity, e.target.value)}
-                      className="w-full bg-[#16161d] border border-white/[0.08] rounded-md px-1 py-0.5 text-center text-[10px] font-mono text-white outline-none focus:border-emerald-400"
-                    />
-                  </div>
-                </div>
-
-                <p className={`text-xs font-mono tabular-nums font-bold w-16 text-right ${item.inCart ? 'text-emerald-400' : 'text-white'}`}>
-                  R$ {(item.estimatedPrice * item.quantity).toFixed(2)}
-                </p>
-
-                <button
-                  onClick={() => {
-                    if (window.confirm("Deseja remover este item?")) {
-                      deleteMarketItem(item.id);
-                    }
-                  }}
-                  className="p-1 text-zinc-500 hover:text-rose-400 transition"
-                >
-                  <Trash2 size={13} />
-                </button>
-              </div>
-            </div>
-          ))}
-
-          <div className="pt-3">
-            <button
-              onClick={() => setIsCheckoutOpen(true)}
-              className="w-full py-3.5 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold font-display rounded-2xl text-xs tracking-wide transition duration-150 active:scale-[0.98] flex items-center justify-center gap-2 shadow-sm"
-            >
-              <ShoppingCart size={15} strokeWidth={2.5} />
-              <span>FINALIZAR E CONVERTER EM DESPESA</span>
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Checkout Modal */}
-      {isCheckoutOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
-          <div className="w-full max-w-sm bg-[#0f0f13] border border-white/[0.08] rounded-2xl p-5 space-y-4">
-            <h4 className="text-sm font-bold text-white uppercase tracking-wider font-display">Finalizar Compras</h4>
-            
-            <p className="text-xs text-zinc-300 leading-relaxed">
-              Lançar a compra de mercado de <strong className="text-white font-mono tabular-nums">R$ {totalEstimated.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong> nas despesas mensais. Escolha a conta:
-            </p>
-
-            <div className="space-y-2">
-              {accounts.map(acc => (
-                <button
-                  key={acc.id}
-                  onClick={() => setSelectedAccountId(acc.id)}
-                  className={`w-full p-3 rounded-xl border text-left flex items-center justify-between transition ${
-                    selectedAccountId === acc.id
-                      ? 'border-emerald-500 bg-emerald-500/10 text-white'
-                      : 'border-white/[0.08] bg-[#16161d] text-zinc-400 hover:text-white'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: acc.color }} />
-                    <span className="text-xs font-semibold">{acc.name}</span>
-                  </div>
-                  <span className="text-xs font-mono tabular-nums">
-                    R$ {acc.balance.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-                  </span>
-                </button>
-              ))}
-            </div>
-
-            <div className="flex gap-2 text-xs font-display pt-2">
-              <button
-                onClick={() => setIsCheckoutOpen(false)}
-                className="flex-1 py-2.5 bg-[#16161d] border border-white/[0.08] text-zinc-400 font-semibold rounded-xl hover:text-white transition"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleFinalizeCheckout}
-                className="flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold rounded-xl transition duration-150 active:scale-[0.98]"
-              >
-                Confirmar Pagamento
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
+  return <div className="mx-auto max-w-4xl space-y-5 pb-24">
+    <div className="flex flex-wrap gap-2 rounded-2xl border border-white/[0.08] bg-[#0f0f13] p-3">
+      <select aria-label="Lista ativa" value={activeId} onChange={(e) => setActiveId(e.target.value)} className="min-h-11 flex-1 rounded-xl bg-[#191920] px-3 text-sm text-white">{lists.map((l) => <option key={l.id} value={l.id}>{l.name}{l.recurring ? ' · recorrente' : ''}</option>)}</select>
+      <button onClick={createList} className="min-h-11 rounded-xl border border-white/[0.1] px-3 text-xs text-white"><Plus size={15} className="inline"/> Nova lista</button>
+      <button onClick={duplicate} className="min-h-11 rounded-xl border border-white/[0.1] px-3 text-xs text-white"><Copy size={15} className="inline"/> Duplicar</button>
+      <button aria-label="Excluir lista" onClick={removeList} className="min-h-11 min-w-11 rounded-xl text-zinc-400 hover:text-rose-400"><Trash2 size={16} className="mx-auto"/></button>
     </div>
-  );
+    <form onSubmit={submit} className="grid gap-2 rounded-2xl border border-white/[0.08] bg-[#0f0f13] p-4 sm:grid-cols-6">
+      <input aria-label="Produto" required value={name} onChange={(e) => setName(e.target.value)} placeholder="Produto" className="min-h-11 rounded-xl bg-[#191920] px-3 text-sm text-white sm:col-span-2"/>
+      <input aria-label="Mercado" value={store} onChange={(e) => setStore(e.target.value)} placeholder="Mercado" className="min-h-11 rounded-xl bg-[#191920] px-3 text-sm text-white"/>
+      <input aria-label="Categoria" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Categoria" className="min-h-11 rounded-xl bg-[#191920] px-3 text-sm text-white"/>
+      <input aria-label="Preço unitário" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="0,00" className="min-h-11 rounded-xl bg-[#191920] px-3 text-sm text-white"/>
+      <button className="min-h-11 rounded-xl bg-emerald-500 px-3 text-xs font-bold text-zinc-950">Adicionar ×{quantity}</button>
+    </form>
+    {items.length === 0 ? <div className="rounded-2xl border border-dashed border-white/[0.1] py-14 text-center text-sm text-zinc-500"><ShoppingBag className="mx-auto mb-2"/>Esta lista está vazia.</div> : <div className="space-y-2">{items.map((item, index) => <article key={item.id} className={`flex items-center gap-3 rounded-2xl border p-3 ${item.inCart ? 'border-emerald-500/25 bg-emerald-500/[0.06]' : 'border-white/[0.08] bg-[#0f0f13]'}`}>
+      <button aria-label={`${item.inCart ? 'Desmarcar' : 'Marcar'} ${item.name}`} onClick={() => toggleMarketItemInCart(item.id)} className={`min-h-11 min-w-11 rounded-xl border ${item.inCart ? 'border-emerald-500 bg-emerald-500 text-black' : 'border-white/[0.12] text-transparent'}`}><Check className="mx-auto" size={16}/></button>
+      <div className="min-w-0 flex-1"><h3 className="truncate text-sm font-semibold text-white">{item.name}</h3><p className="text-[11px] text-zinc-500">{item.store || 'Mercado não definido'} · {item.category || 'Outros'}{item.lastPurchasedPrice != null && <span> · última {money(item.lastPurchasedPrice)}</span>}</p></div>
+      <input aria-label={`Quantidade de ${item.name}`} type="number" min="1" value={item.quantity} onChange={(e) => updateMarketItem(item.id, Math.max(1, Number(e.target.value)), item.estimatedPrice)} className="h-11 w-14 rounded-lg bg-[#191920] px-2 text-center text-xs text-white"/>
+      <input aria-label={`Preço de ${item.name}`} type="number" min="0" step="0.01" value={item.estimatedPrice} onChange={(e) => updateMarketItem(item.id, item.quantity, Number(e.target.value))} className="h-11 w-24 rounded-lg bg-[#191920] px-2 text-xs text-white"/>
+      <div className="flex"><button disabled={index===0} aria-label="Mover para cima" onClick={() => move(index,-1)} className="min-h-11 min-w-8 disabled:opacity-20"><ChevronUp size={14}/></button><button disabled={index===items.length-1} aria-label="Mover para baixo" onClick={() => move(index,1)} className="min-h-11 min-w-8 disabled:opacity-20"><ChevronDown size={14}/></button></div>
+      <button aria-label={`Excluir ${item.name}`} onClick={() => deleteMarketItem(item.id)} className="min-h-11 min-w-11 text-zinc-500 hover:text-rose-400"><Trash2 size={15} className="mx-auto"/></button>
+    </article>)}</div>}
+    <div className="flex flex-wrap gap-2"><button disabled={!checked.length} onClick={() => setCheckout(true)} className="min-h-12 flex-1 rounded-2xl bg-emerald-500 px-4 text-sm font-bold text-zinc-950 disabled:cursor-not-allowed disabled:opacity-40"><ShoppingCart size={16} className="mr-2 inline"/>Revisar {checked.length} {checked.length === 1 ? 'item' : 'itens'} — {money(total)}</button><button disabled={!checked.length} onClick={() => checked.forEach((i) => deleteMarketItem(i.id))} className="min-h-12 rounded-2xl border border-white/[0.1] px-4 text-xs text-zinc-300 disabled:opacity-40">Limpar comprados</button></div>
+    {checkout && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4" role="dialog" aria-modal="true" aria-labelledby="checkout-title"><div className="w-full max-w-lg space-y-4 rounded-3xl border border-white/[0.1] bg-[#101015] p-5"><div className="flex items-center justify-between"><h2 id="checkout-title" className="font-bold text-white">Revisar lançamento</h2><button aria-label="Fechar" onClick={() => setCheckout(false)} className="min-h-11 min-w-11"><X className="mx-auto"/></button></div><ul className="max-h-48 space-y-2 overflow-auto">{checked.map((i) => <li key={i.id} className="flex justify-between text-xs text-zinc-300"><span>{i.quantity}× {i.name}</span><strong>{money(i.quantity*i.estimatedPrice)}</strong></li>)}</ul><div className="border-t border-white/[0.08] pt-3 text-right font-mono font-bold text-white">Total {money(total)}</div><label className="block text-xs text-zinc-400">Conta ou cartão<select autoFocus value={destination} onChange={(e) => setDestination(e.target.value)} className="mt-2 min-h-11 w-full rounded-xl bg-[#191920] px-3 text-white">{accounts.map((a) => <option key={a.id} value={a.id}>{a.name} · {a.type === 'credit' ? 'cartão' : money(a.balance)}</option>)}</select></label>{safeAfter !== null && <p className={`rounded-xl p-3 text-xs ${safeAfter < 0 ? 'bg-rose-500/10 text-rose-300' : 'bg-emerald-500/10 text-emerald-300'}`}>Saldo após a compra: <strong>{money(safeAfter)}</strong>{safeAfter < 0 && ' · saldo negativo'}</p>}<button disabled={!destination} onClick={() => { convertMarketListToExpense(destination, activeId); setCheckout(false); }} className="min-h-12 w-full rounded-xl bg-emerald-500 font-bold text-zinc-950">Confirmar {checked.length} itens — {money(total)}</button></div></div>}
+  </div>;
 }
