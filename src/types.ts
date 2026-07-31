@@ -25,6 +25,7 @@ export interface Transaction {
   kind?: TransactionKind;
   creditCardId?: string;
   invoiceId?: string;
+  priority?: 'high' | 'normal';
 }
 
 export interface Account {

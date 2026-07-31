@@ -445,7 +445,17 @@ export default function HistoryView({ onEditTransaction }: HistoryViewProps) {
           <div className="flex gap-1" role="group" aria-label="Agrupar movimentações">
             {([['category', 'Por categoria'], ['account', 'Por conta/cartão']] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={groupMode === value} onClick={() => setGroupMode(value)} className={`min-h-11 rounded-xl px-3 text-xs font-semibold transition ${groupMode === value ? 'bg-[#24242c] text-white' : 'text-zinc-400 hover:bg-white/[0.05] hover:text-white'}`}>{label}</button>)}
           </div>
-          <div className="flex items-center gap-2"><span className="text-xs text-zinc-400">{selectedIds.length} selecionada{selectedIds.length === 1 ? '' : 's'}</span><button type="button" disabled={selectedIds.length < 2} onClick={() => setShowMultiScenario(true)} className="min-h-11 rounded-xl bg-[#10b981] px-3 text-xs font-bold text-[#07110e] transition disabled:cursor-not-allowed disabled:opacity-40">Simular seleção</button></div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-zinc-400">{selectedIds.length ? `${selectedIds.length} selecionada${selectedIds.length === 1 ? '' : 's'}` : 'Selecione uma despesa pendente abaixo'}</span>
+            <button
+              type="button"
+              disabled={selectedIds.length === 0}
+              onClick={() => selectedIds.length === 1 ? setTransactionToSimulate(selectedTransactions[0]) : setShowMultiScenario(true)}
+              className="min-h-11 rounded-xl bg-[#10b981] px-4 text-xs font-bold text-[#07110e] transition disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Criar cenário com a seleção
+            </button>
+          </div>
         </div>
 
         {undoTransaction && <div role="status" className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.08] bg-[#16161d] p-3"><p className="text-xs text-zinc-300">Situação de “{undoTransaction.description}” alterada.</p><button type="button" onClick={undoLastStatusChange} className="flex min-h-11 items-center gap-2 rounded-xl px-3 text-xs font-semibold text-emerald-300 hover:bg-[#10251f]"><Undo2 size={15} />Desfazer</button></div>}
@@ -581,7 +591,7 @@ export default function HistoryView({ onEditTransaction }: HistoryViewProps) {
                               </div>
 
                               {/* Action controls */}
-                              <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                              <div className="flex items-center gap-1">
                                 {isExpense && !isCompleted && (
                                   <button
                                     onClick={() => setTransactionToSimulate(t)}
@@ -590,6 +600,7 @@ export default function HistoryView({ onEditTransaction }: HistoryViewProps) {
                                     aria-label={`Simular pagamento de ${t.description}`}
                                   >
                                     <Activity size={14} aria-hidden="true" />
+                                    <span className="hidden lg:inline text-[10px] font-semibold">Simular</span>
                                   </button>
                                 )}
                                 <button

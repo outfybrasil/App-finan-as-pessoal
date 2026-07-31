@@ -143,6 +143,7 @@ const serializeTransaction = (t: Transaction) => {
     kind: t.kind || 'transaction',
     credit_card_id: t.creditCardId ? prefixId(t.creditCardId) : null,
     invoice_id: t.invoiceId || null,
+    priority: t.priority || 'normal',
   };
 };
 
@@ -181,6 +182,7 @@ const deserializeTransaction = (doc: any): Transaction => {
     kind: doc.kind || undefined,
     creditCardId: doc.creditCardId || doc.credit_card_id ? unprefixId(doc.creditCardId || doc.credit_card_id) : undefined,
     invoiceId: doc.invoiceId || doc.invoice_id || undefined,
+    priority: doc.priority === 'high' ? 'high' : 'normal',
   };
 };
 

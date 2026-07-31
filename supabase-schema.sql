@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS transactions (
   ,kind text
   ,credit_card_id text
   ,invoice_id text
+  ,priority text DEFAULT 'normal'
 );
 
 CREATE TABLE IF NOT EXISTS market_items (

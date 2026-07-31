@@ -6,6 +6,7 @@ import SelectAccountModal from './SelectAccountModal';
 import ConfirmDeleteModal from './ConfirmDeleteModal';
 import CreditCardsOverview from './CreditCardsOverview';
 import { getTransactionTotals, getTransactionsForView, type FinancialView } from '../lib/finance';
+import AutomaticScenarioModal from './AutomaticScenarioModal';
 
 interface DashboardViewProps {
   onEditTransaction: (t: Transaction) => void;
@@ -47,6 +48,7 @@ export default function DashboardView({ onEditTransaction }: DashboardViewProps)
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'scheduled' | 'completed'>('all');
   const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all');
   const [financialView, setFinancialView] = useState<FinancialView>('realized');
+  const [showAutomaticScenario, setShowAutomaticScenario] = useState(false);
 
   // States for toggle status payment
   const [transactionToComplete, setTransactionToComplete] = useState<Transaction | null>(null);
@@ -288,6 +290,11 @@ export default function DashboardView({ onEditTransaction }: DashboardViewProps)
           {hideValues ? <EyeOff size={16} /> : <Eye size={16} />}
         </button>
       </div>
+
+      <section className="flex flex-col gap-4 rounded-2xl border border-emerald-500/20 bg-[#102019] p-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="max-w-xl"><h2 className="text-base font-bold text-white">Encontre o melhor caminho para pagar o mês</h2><p className="mt-1 text-xs leading-relaxed text-emerald-100/70">Um clique analisa saldos, receitas e todas as despesas abertas de {monthsNames[currentMonth]}, apresentando três estratégias prontas.</p></div>
+        <button type="button" onClick={() => setShowAutomaticScenario(true)} className="flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-xl bg-emerald-500 px-5 text-sm font-bold text-[#07110e] transition hover:bg-emerald-400 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"><Sparkles size={17} aria-hidden="true"/>Simular meu mês</button>
+      </section>
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="grid grid-cols-3 gap-1 rounded-xl border border-white/[0.08] bg-[#0f0f13] p-1" role="group" aria-label="Visão dos totais do mês">
@@ -745,6 +752,8 @@ export default function DashboardView({ onEditTransaction }: DashboardViewProps)
           transaction={transactionToDelete}
         />
       )}
+
+      <AutomaticScenarioModal isOpen={showAutomaticScenario} onClose={() => setShowAutomaticScenario(false)} accounts={accounts} transactions={transactions} period={monthPeriod} monthLabel={`${monthsNames[currentMonth]} de ${currentYear}`} hideValues={hideValues} />
     </div>
   );
 }

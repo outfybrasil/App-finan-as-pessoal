@@ -23,6 +23,7 @@ export default function TransactionModal({ isOpen, onClose, editingTransaction, 
   const [entries, setEntries] = useState<{date: string, status: 'pending' | 'completed' | 'scheduled'}[]>([{date: '', status: 'completed'}]);
   
   const [isFixed, setIsFixed] = useState(false);
+  const [isPriority, setIsPriority] = useState(false);
   const [isInstallment, setIsInstallment] = useState(false);
   const [totalInstallments, setTotalInstallments] = useState(12);
 
@@ -39,6 +40,7 @@ export default function TransactionModal({ isOpen, onClose, editingTransaction, 
       setAccountId(editingTransaction.accountId);
       setEntries([{ date: editingTransaction.date, status: editingTransaction.status }]);
       setIsFixed(editingTransaction.isFixed);
+      setIsPriority(editingTransaction.priority === 'high');
       setIsInstallment(editingTransaction.isInstallment);
       setTotalInstallments(editingTransaction.installmentInfo?.total || 12);
     } else {
@@ -50,6 +52,7 @@ export default function TransactionModal({ isOpen, onClose, editingTransaction, 
       setAccountId(accounts[0]?.id || '');
       setEntries([{ date: initialDate || getLocalIsoDate(), status: 'scheduled' }]);
       setIsFixed(false);
+      setIsPriority(false);
       setIsInstallment(false);
       setTotalInstallments(12);
     }
@@ -89,6 +92,7 @@ export default function TransactionModal({ isOpen, onClose, editingTransaction, 
           date: entries[0].date,
           status: selectedAccount?.type === 'credit' ? getEffectiveStatus('scheduled', entries[0].date) : entries[0].status,
           isFixed,
+          priority: isPriority ? 'high' : 'normal',
           isInstallment,
           installmentInfo: isInstallment ? {
             current: editingTransaction.installmentInfo?.current || 1,
@@ -110,6 +114,7 @@ export default function TransactionModal({ isOpen, onClose, editingTransaction, 
           date: entries[0].date,
           status: selectedAccount?.type === 'credit' ? getEffectiveStatus('scheduled', entries[0].date) : entries[0].status,
           isFixed,
+          priority: isPriority ? 'high' : 'normal',
           isInstallment,
           installmentInfo: isInstallment ? {
             current: editingTransaction.installmentInfo?.current || 1,
@@ -130,6 +135,7 @@ export default function TransactionModal({ isOpen, onClose, editingTransaction, 
           date: entry.date,
           status: selectedAccount?.type === 'credit' ? getEffectiveStatus('scheduled', entry.date) : entry.status,
           isFixed,
+          priority: isPriority ? 'high' : 'normal',
           isInstallment,
           totalInstallments: isInstallment ? totalInstallments : undefined,
           ...cardFields,
@@ -386,6 +392,13 @@ export default function TransactionModal({ isOpen, onClose, editingTransaction, 
               ))}
             </div>
           </div>
+
+          {type === 'expense' && (
+            <div className="flex items-center justify-between rounded-xl border border-amber-500/20 bg-amber-500/[0.06] p-3.5">
+              <div><h4 className="text-xs font-semibold text-white">Conta prioritária</h4><p className="text-[10px] text-amber-100/65">O simulador tentará pagar esta despesa antes das demais.</p></div>
+              <button type="button" role="switch" aria-checked={isPriority} aria-label="Marcar como conta prioritária" onClick={() => setIsPriority((value) => !value)} className={`min-h-11 min-w-14 rounded-xl border text-xs font-bold transition ${isPriority ? 'border-amber-400 bg-amber-400 text-[#171006]' : 'border-white/[0.1] bg-[#16161d] text-zinc-400'}`}>{isPriority ? 'Sim' : 'Não'}</button>
+            </div>
+          )}
 
           {/* Advanced Toggles */}
           {!editingTransaction && (
